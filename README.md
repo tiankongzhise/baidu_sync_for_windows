@@ -1,0 +1,2 @@
+# baidu_sync_for_windows
+将百度的文件或者文件夹加密保存到百度网盘
