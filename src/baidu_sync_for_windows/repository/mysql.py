@@ -1,11 +1,17 @@
-from sqlalchemy import Engine
-from dtos import ScanDTO,CompressDTO,VerifyDTO,BackupDTO
-from typing import overload
 
+from baidu_sync_for_windows.dtos import ScanDTO,CompressDTO,VerifyDTO,BackupDTO
+from baidu_sync_for_windows.exception import RepositoryException
+from baidu_sync_for_windows.logger import get_logger
+from sqlalchemy import Engine
+from typing import overload
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 class MysqlRepository:
     def __init__(self,engine:Engine):
         self.engine = engine
+        self.logger = get_logger(bind={'repository_name':'mysql'})
+        self._test_connection()
     @overload
     def save(self,data:ScanDTO):
         ...
@@ -36,3 +42,12 @@ class MysqlRepository:
         ...
     def execute(self,query:str):
         ...
+    def _test_connection(self):
+        try:
+            with Session(self.engine) as session:
+                session.execute(text("SELECT 1"))
+                session.commit()
+                self.logger.info("Connection test successful")
+        except Exception as e:
+            self.logger.error(f"Failed to test connection: {e}")
+            raise RepositoryException(f"Failed to test connection: {e}")

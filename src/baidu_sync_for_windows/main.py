@@ -2,9 +2,8 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import queue
 import threading
-from service import scan_object,compress_object,verify_object,backup_object,Scheduler
-from repository import default_repository,DefaultRepository
-import time
+from baidu_sync_for_windows.service import scan_object,compress_object,verify_object,backup_object,Scheduler
+from baidu_sync_for_windows.repository import default_repository,DefaultRepository
 END_OF_QUEUE = object()
 backup_queue = queue.Queue()
 def sync_object_producer(object_path:str|Path,repository:DefaultRepository,scheduler:Scheduler):
