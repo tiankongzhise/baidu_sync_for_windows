@@ -2,11 +2,12 @@ from .scan import scan_object
 from .compress import compress_object
 from .verify import verify_object
 from .backup import backup_object
-from .scheduler import Scheduler
+from .scheduler import Scheduler,DiskSpaceCoordinator
 __all__ = [
     "scan_object",
     "compress_object",
     "verify_object",
     "backup_object",
-    "Scheduler"
+    "Scheduler",
+    "DiskSpaceCoordinator"
 ]
