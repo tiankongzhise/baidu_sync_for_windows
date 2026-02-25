@@ -2,13 +2,14 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import queue
 import threading
-from baidu_sync_for_windows.service import scan_object,compress_object,verify_object,backup_object,DiskSpaceCoordinator
+from typing import Callable
+from baidu_sync_for_windows.service import scan_service,compress_object,verify_object,backup_object,DiskSpaceCoordinator
 from baidu_sync_for_windows.repository import default_repository,DefaultRepository
+from baidu_sync_for_windows.config import get_config
+from baidu_sync_for_windows.dtos import ScanDTO
 END_OF_QUEUE = object()
 backup_queue = queue.Queue()
-def sync_object_producer(object_path:str|Path,repository:DefaultRepository,disk_space_coordinator:DiskSpaceCoordinator):
-    scan_result = scan_object(object_path)
-    repository.save(scan_result)
+def sync_object_producer(scan_result:ScanDTO,repository:DefaultRepository,disk_space_coordinator:DiskSpaceCoordinator):
     compress_result = compress_object(scan_result,disk_space_coordinator)
     repository.save(compress_result)
     verify_result = verify_object(compress_result,disk_space_coordinator)
@@ -27,27 +28,47 @@ def sync_object_consumer(repository:DefaultRepository,disk_space_coordinator:Dis
         backup_queue.task_done()
 
 
+def get_dependency():
+    disk_space_coordinator = DiskSpaceCoordinator(
+    {
+        'compression': 40 * 1024 * 1024 * 1024,
+        'verification': 30 * 1024 * 1024 * 1024,
+        'backup': 10 * 1024 * 1024 * 1024,
+    }
+)
+    repository = default_repository()
+    return disk_space_coordinator,repository
+
+def get_objects():
+    config = get_config()
+    target_path_list = config.source_path.target_path
+    scan_result = scan_service(target_path_list)
+    return scan_result
+
+def start_consumer(consumer_worker:Callable,repository:DefaultRepository,disk_space_coordinator:DiskSpaceCoordinator):
+    consumer_thread = threading.Thread(target=consumer_worker,args=(repository,disk_space_coordinator))
+    consumer_thread.start()
+    return consumer_thread
+
+def start_producer(producer_worker:Callable,objects:list[ScanDTO],repository:DefaultRepository,disk_space_coordinator:DiskSpaceCoordinator):
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        for object in objects:
+            executor.submit(producer_worker,object,repository,disk_space_coordinator)
+
+def wait_for_complete(consumer_thread:threading.Thread,consumer_queue:queue.Queue):
+    consumer_queue.join()
+    consumer_queue.put(END_OF_QUEUE)
+    consumer_thread.join()
+
 def main():
     print("Starting program")
     try:
-        disk_space_coordinator = DiskSpaceCoordinator(
-            {
-                'compression': 40 * 1024 * 1024 * 1024,
-                'verification': 30 * 1024 * 1024 * 1024,
-                'backup': 10 * 1024 * 1024 * 1024,
-            }
-        )
-        repository = default_repository()
-        objects = [...]
-        consumer_thread = threading.Thread(target=sync_object_consumer,args=(repository,disk_space_coordinator))
-        consumer_thread.start()
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            for object in objects:
-                executor.submit(sync_object_producer,object,repository,disk_space_coordinator)
-        backup_queue.join()
-        backup_queue.put(END_OF_QUEUE)
-        print("Waiting for consumer thread to finish")
-        consumer_thread.join()
+        disk_space_coordinator,repository = get_dependency()
+        objects = get_objects()
+        consumer_thread = start_consumer(sync_object_consumer,repository,disk_space_coordinator)
+        start_producer(sync_object_producer,objects,repository,disk_space_coordinator)
+        wait_for_complete(consumer_thread,backup_queue)
+        print("Program completed successfully")
     except KeyboardInterrupt:
         print("Keyboard interrupt received, terminating program")
         backup_queue.put(END_OF_QUEUE)

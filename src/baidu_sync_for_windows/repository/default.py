@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from baidu_sync_for_windows.config import get_config
 from .mysql import MysqlRepository
 DefaultRepository = MysqlRepository
-def default_repository()->MysqlRepository:
+def get_default_repository()->MysqlRepository:
     config = get_config()
     database = config.database.database_config.database 
     connector = config.database.database_config.connector
