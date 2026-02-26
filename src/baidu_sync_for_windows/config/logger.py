@@ -7,4 +7,4 @@ class LoggingSettings(TomlBaseSettings):
         pyproject_toml_table_header=("loguru_settings",),
         extra="ignore",
     )
-    console_level: str = Field(default="SERVICE", description="日志级别")
+    console_level: str = Field(default="SERVICE_INFO", description="日志级别")

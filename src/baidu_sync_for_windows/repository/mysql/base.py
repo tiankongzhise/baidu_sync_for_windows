@@ -53,6 +53,7 @@ class RepositoryStrategyInterface(ABC, Generic[DTO, Record]):
     def __init__(self, record_class: Type[Record], dto_class: Type[DTO]):
         self.record_class = record_class
         self.dto_class = dto_class
+        self.logger = get_logger(bind={"module_name":self.__class__.__name__})
     @abstractmethod
     def insert(self, repo, data: DTO) -> Record:
         with Session(repo.engine) as session:
@@ -61,6 +62,7 @@ class RepositoryStrategyInterface(ABC, Generic[DTO, Record]):
             session.commit()
             session.refresh(record)
             session.expunge(record)
+            self.logger.log("MODULE_BASE_INFO",f"insert data: {data.model_dump()}")
             return cast(Record, record)
 
     @abstractmethod
@@ -75,6 +77,7 @@ class RepositoryStrategyInterface(ABC, Generic[DTO, Record]):
             session.commit()
             session.refresh(record)
             session.expunge(record)
+            self.logger.log("MODULE_BASE_INFO",f"update data: {data.model_dump()}")
             return cast(Record, record)
 
     @abstractmethod
@@ -88,27 +91,37 @@ class RepositoryStrategyInterface(ABC, Generic[DTO, Record]):
                 .first()
             )
             if record:
+                self.logger.log("MODULE_BASE_INFO",f"get by source object id: {source_object_id}")
                 return cast(Record, record)
+            self.logger.log("MODULE_BASE_INFO",f"get by source object id: {source_object_id} not found")
             return None
 
     @abstractmethod
     def save(self, repo, data: DTO) -> Record:
         if getattr(data, "source_object_id", None) is None:
+            self.logger.error(f"save failed: Source object id is required, data: {data}")
             raise RepositoryException(f"base strategy save failed: Source object id is required, data: {data}")
         record = self.get_by_source_object_id(repo, data.source_object_id)  # type: ignore
         if not record:
+            self.logger.log("MODULE_BASE_INFO",f"save: insert data: {data.model_dump()}")
             return self.insert(repo, data)
         if self.is_equal(record, data):
+            self.logger.log("MODULE_BASE_INFO",f"save: record is equal to data: {data.model_dump()}")
             return record
+        self.logger.log("MODULE_BASE_INFO",f"save: update data: {data.model_dump()}")
         return self.update(repo, data)
 
     @abstractmethod
     def execute(self, repo, query: str) -> Sequence[Any] | None:
         with Session(repo.engine) as session:
-            return session.execute(text(query)).all()
+            result = session.execute(text(query)).all()
+            self.logger.log("MODULE_BASE_INFO",f"execute query: {query} result: {result}")
+            return result
     @abstractmethod
     def is_equal(self, record: Record, data: DTO) -> bool:
         for key, value in data.model_dump().items():
             if getattr(record, key) != value:
+                self.logger.debug(f"record:{record} is not equal dto:{data} key:{key} value:{getattr(record, key)} != {value}")
                 return False
+        self.logger.debug(f"record:{record} is equal to dto:{data}")
         return True
