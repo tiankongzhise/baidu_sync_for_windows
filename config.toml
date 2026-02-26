@@ -1,0 +1,4 @@
+[scan_settings]
+oversize = "20 * 1024 * 1024 * 1024"
+[source_path_settings]
+target_path = ["D:\\测试AI运行",'E:\\测试.txt']

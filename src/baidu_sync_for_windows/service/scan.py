@@ -13,6 +13,13 @@ def _check_file_path(file_path:str|Path)->Path:
         raise ScanServiceException(f"File not found: {file_path}")
     return file_path
 
+
+def scan_service(target_path_list:list[Path]|list[str])->list[ScanDTO]:
+    result = []
+    for target_path in target_path_list:
+        result.extend(scan_object(target_path))
+    return result
+
 def scan_object(file_path:str|Path)->list[ScanDTO]:
     file_path = _check_file_path(file_path)
     if file_path.is_file():
@@ -23,8 +30,11 @@ def scan_object(file_path:str|Path)->list[ScanDTO]:
     for item in items:
         if item.is_file():
             result.append(_scan_file(item))
-        elif item.is_directory():
+        elif item.is_dir():
             result.append(_scan_directory(item))
+        else:
+            logger.warning(f"Unknown item type: {item}")
+            raise ScanServiceException(f"Unknown item type: {item}")
     return result
 
 def _get_process_type(object_size: int) -> Literal["auto", "manual"]:
@@ -75,3 +85,12 @@ def _scan_directory(directory_path:Path)->ScanDTO:
         target_object_items_count=items_count,
         target_object_items=items,
     )
+
+
+if __name__ == "__main__":
+    target_path_list = [
+        r"E:\OneDrive\2025年项目\智擎领途公司\公司基本信息照片",
+        r"D:\测试AI运行",
+    ]
+    result = scan_service(target_path_list)
+    print(result)

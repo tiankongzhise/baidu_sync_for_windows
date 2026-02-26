@@ -9,8 +9,13 @@ from .upload import BaiduPanUploadSettings
 from .base import drive_letter
 from pydantic_settings import BaseSettings
 from pydantic import Field
+from .source import SourcePathSettings
+
+
+
 class ConfigSettings(BaseSettings):
     drive_letter: str = Field(default=drive_letter(), description="驱动器字母")
+    source_path: SourcePathSettings = Field(default=SourcePathSettings(), description="源路径设置")
     database: DatabaseSettings = Field(default=DatabaseSettings(), description="数据库设置")
     scan: ScanSettings = Field(default=ScanSettings(), description="扫描设置")
     hash: HashSettings = Field(default=HashSettings(), description="哈希设置")

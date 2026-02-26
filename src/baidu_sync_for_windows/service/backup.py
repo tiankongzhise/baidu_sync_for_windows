@@ -1,4 +1,4 @@
-from baidu_sync_for_windows.dtos import VerifyDTO,BackupDTO
-from .scheduler import Scheduler
-def backup_object(verify_result:VerifyDTO,scheduler:Scheduler)->BackupDTO:
+from baidu_sync_for_windows.dtos import BackupDTO
+from .scheduler import DiskSpaceCoordinator
+def backup_object(source_object_id:int,disk_space_coordinator:DiskSpaceCoordinator)->BackupDTO:
     ...

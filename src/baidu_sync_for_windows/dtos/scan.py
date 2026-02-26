@@ -33,3 +33,4 @@ class ScanDTO(BaseModel):
             except Exception as e:
                 raise ScanServiceException(f"目标对象项{key}时间戳格式错误: {e}")
         return v
+
