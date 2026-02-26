@@ -1,11 +1,10 @@
 from .base import Base
 from sqlalchemy.orm import Mapped, mapped_column,relationship
 from sqlalchemy import  MetaData,UniqueConstraint,String,JSON,Integer,ForeignKey
-from typing import Literal,Annotated
+from typing import Literal
 class ServiceBase(Base):
     __abstract__ = True
     metadata = MetaData()
-source_object_fk = Annotated[int, mapped_column(Integer, ForeignKey('source_object_record.id'))]
 class SourceObjectRecord(ServiceBase):
     __tablename__ = "source_object_record"
     drive_letter: Mapped[str] = mapped_column(String(255))
@@ -24,7 +23,8 @@ class SourceObjectRecord(ServiceBase):
 
 class ObjectHashRecord(ServiceBase):
     __tablename__ = "object_hash_record"
-    source_object_id: Mapped[source_object_fk] = relationship(backref='source_object_record')
+    source_object_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_object_record.id"))
+    source_object: Mapped["SourceObjectRecord"] = relationship("SourceObjectRecord", backref="object_hash_records")
     md5: Mapped[str] = mapped_column(String(32))
     sha1: Mapped[str] = mapped_column(String(40))
     sha256: Mapped[str] = mapped_column(String(64))
@@ -36,7 +36,8 @@ class ObjectHashRecord(ServiceBase):
         return (f"ObjectHashRecord(id={self.id}, source_object_id={self.source_object_id}, md5={self.md5}, sha1={self.sha1}, sha256={self.sha256}, fast_hash={self.fast_hash}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class ObjectCompressRecord(ServiceBase):
     __tablename__ = "compress_object_record"
-    source_object_id: Mapped[source_object_fk] = relationship(backref='source_object_record')
+    source_object_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_object_record.id"))
+    source_object: Mapped["SourceObjectRecord"] = relationship("SourceObjectRecord", backref="object_compress_records")
     compress_object_path: Mapped[str] = mapped_column(String(255))
     __table_args__ = (
         UniqueConstraint("source_object_id",name="uix_source_object_id"),
@@ -45,7 +46,8 @@ class ObjectCompressRecord(ServiceBase):
         return (f"CompressObjectRecord(id={self.id}, source_object_id={self.source_object_id}, compress_object_path={self.compress_object_path}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class ObjectEncryptNameCompressRecord(ServiceBase):
     __tablename__ = "encrypt_name_compress_object_record"
-    source_object_id: Mapped[source_object_fk] = relationship(backref='source_object_record')
+    source_object_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_object_record.id"))
+    source_object: Mapped["SourceObjectRecord"] = relationship("SourceObjectRecord", backref="object_encrypt_name_compress_records")
     encrypt_name_compress_object_path: Mapped[str] = mapped_column(String(255))
     __table_args__ = (
         UniqueConstraint("source_object_id",name="uix_source_object_id"),
@@ -54,7 +56,8 @@ class ObjectEncryptNameCompressRecord(ServiceBase):
         return (f"EncryptNameCompressObjectRecord(id={self.id}, source_object_id={self.source_object_id}, encrypt_name_compress_object_path={self.encrypt_name_compress_object_path}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class ObjectVerifyRecord(ServiceBase):
     __tablename__ = "verify_object_record"
-    source_object_id: Mapped[source_object_fk] = relationship(backref='source_object_record')
+    source_object_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_object_record.id"))
+    source_object: Mapped["SourceObjectRecord"] = relationship("SourceObjectRecord", backref="object_verify_records")
     verify_object_path: Mapped[str] = mapped_column(String(255))
     __table_args__ = (
         UniqueConstraint("source_object_id",name="uix_source_object_id"),
@@ -63,7 +66,8 @@ class ObjectVerifyRecord(ServiceBase):
         return (f"VerifyObjectRecord(id={self.id}, source_object_id={self.source_object_id}, verify_object_path={self.verify_object_path}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class ObjectEncryptNameVerifyRecord(ServiceBase):
     __tablename__ = "encrypt_name_verify_object_record"
-    source_object_id: Mapped[source_object_fk] = relationship(backref='source_object_record')
+    source_object_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_object_record.id"))
+    source_object: Mapped["SourceObjectRecord"] = relationship("SourceObjectRecord", backref="object_encrypt_name_verify_records")
     encrypt_name_verify_object_path: Mapped[str] = mapped_column(String(255))
     __table_args__ = (
         UniqueConstraint("source_object_id",name="uix_source_object_id"),
@@ -72,7 +76,8 @@ class ObjectEncryptNameVerifyRecord(ServiceBase):
         return (f"EncryptNameVerifyObjectRecord(id={self.id}, source_object_id={self.source_object_id}, encrypt_name_verify_object_path={self.encrypt_name_verify_object_path}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class ObjectBackupRecord(ServiceBase):
     __tablename__ = "backup_object_record"
-    source_object_id: Mapped[source_object_fk] = relationship(backref='source_object_record')
+    source_object_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_object_record.id"))
+    source_object: Mapped["SourceObjectRecord"] = relationship("SourceObjectRecord", backref="object_backup_records")
     backup_object_path: Mapped[str] = mapped_column(String(255))
     backup_object_hash: Mapped[str] = mapped_column(String(32))
     __table_args__ = (
@@ -83,7 +88,8 @@ class ObjectBackupRecord(ServiceBase):
         return (f"BackupObjectRecord(id={self.id}, source_object_id={self.source_object_id}, backup_object_path={self.backup_object_path}, backup_object_hash={self.backup_object_hash}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class ObjectEncryptNameBackupRecord(ServiceBase):
     __tablename__ = "encrypt_name_backup_object_record"
-    source_object_id: Mapped[source_object_fk] = relationship(backref='source_object_record')
+    source_object_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_object_record.id"))
+    source_object: Mapped["SourceObjectRecord"] = relationship("SourceObjectRecord", backref="object_encrypt_name_backup_records")
     encrypt_name_backup_object_path: Mapped[str] = mapped_column(String(255))
     encrypt_name_backup_object_hash: Mapped[str] = mapped_column(String(32))
     __table_args__ = (

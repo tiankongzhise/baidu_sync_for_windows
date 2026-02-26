@@ -1,5 +1,16 @@
 from .oauth import OauthRecord
-from .service import SourceObjectRecord,ObjectHashRecord,ObjectCompressRecord,ObjectVerifyRecord,ObjectBackupRecord,ObjectEncryptNameCompressRecord,ObjectEncryptNameVerifyRecord,ObjectEncryptNameBackupRecord
+from .service import (
+    SourceObjectRecord,
+    ObjectHashRecord,
+    ObjectCompressRecord,
+    ObjectVerifyRecord,
+    ObjectBackupRecord,
+    ObjectEncryptNameCompressRecord,
+    ObjectEncryptNameVerifyRecord,
+    ObjectEncryptNameBackupRecord,
+    ServiceBase,
+)
+
 __all__ = [
     "OauthRecord",
     "SourceObjectRecord",
@@ -9,5 +20,6 @@ __all__ = [
     "ObjectBackupRecord",
     "ObjectEncryptNameCompressRecord",
     "ObjectEncryptNameVerifyRecord",
-    "ObjectEncryptNameBackupRecord"
+    "ObjectEncryptNameBackupRecord",
+    "ServiceBase",
 ]

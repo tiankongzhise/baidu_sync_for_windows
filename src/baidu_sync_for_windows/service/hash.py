@@ -1,0 +1,3 @@
+from baidu_sync_for_windows.dtos import HashDTO
+def hash_service(source_object_id:int)->HashDTO:
+    ...
