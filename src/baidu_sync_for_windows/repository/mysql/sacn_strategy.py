@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from baidu_sync_for_windows.dtos import ScanDTO
 from baidu_sync_for_windows.models import SourceObjectRecord
 from baidu_sync_for_windows.logger import get_logger
-from .base import RepositoryStrategyInterface
+from .base import RepositoryStrategyInterface, RepositoryProtocol
 
 
 class Scanstrategy(RepositoryStrategyInterface[ScanDTO, SourceObjectRecord]):
@@ -11,18 +11,18 @@ class Scanstrategy(RepositoryStrategyInterface[ScanDTO, SourceObjectRecord]):
         super().__init__(SourceObjectRecord, ScanDTO)
         self.logger = get_logger(bind={"module_name":self.__class__.__name__})
 
-    def insert(self, repo: Any, data: ScanDTO) -> SourceObjectRecord:
+    def insert(self, repo: RepositoryProtocol, data: ScanDTO) -> SourceObjectRecord:
         record = super().insert(repo, data)
         self.logger.log("MODULE_INFO",f"scan strategy insert data: {data.model_dump()}")
         return record
 
-    def update(self, repo: Any, data: ScanDTO) -> SourceObjectRecord:
+    def update(self, repo: RepositoryProtocol, data: ScanDTO) -> SourceObjectRecord:
         record = self._save_without_id(repo, data)
         self.logger.log("MODULE_INFO",f"scan strategy update data: {data.model_dump()}")
         return record
 
     def get_by_id(
-        self, repo: Any, id: int
+        self, repo: RepositoryProtocol, id: int
     ) -> SourceObjectRecord | None:
         with Session(repo.engine) as session:
             record = (
@@ -38,7 +38,7 @@ class Scanstrategy(RepositoryStrategyInterface[ScanDTO, SourceObjectRecord]):
             return record
 
     def get_by_source_object_id(
-        self, repo: Any, source_object_id: int
+        self, repo: RepositoryProtocol, source_object_id: int
     ) -> SourceObjectRecord | None:
         record = self.get_by_id(repo, source_object_id)
         if not record:
@@ -47,12 +47,12 @@ class Scanstrategy(RepositoryStrategyInterface[ScanDTO, SourceObjectRecord]):
         self.logger.log("MODULE_INFO",f"scan strategy get by source object id: {source_object_id} found")
         return record
 
-    def save(self, repo: Any, data: ScanDTO) -> SourceObjectRecord:
+    def save(self, repo: RepositoryProtocol, data: ScanDTO) -> SourceObjectRecord:
         record = self._save_without_id(repo, data)
         self.logger.log("MODULE_INFO",f"scan strategy save data: {data.model_dump()}")
         return record
 
-    def execute(self, repo: Any, query: str) -> Sequence[Any] | None:
+    def execute(self, repo: RepositoryProtocol, query: str) -> Sequence[Any] | None:
         result = super().execute(repo, query)
         self.logger.log("MODULE_INFO",f"scan strategy execute query: {query} result: {result}")
         return result
@@ -63,7 +63,7 @@ class Scanstrategy(RepositoryStrategyInterface[ScanDTO, SourceObjectRecord]):
         return result
 
     def _save_without_id(
-        self, repo: Any, data: ScanDTO
+        self, repo: RepositoryProtocol, data: ScanDTO
     ) -> SourceObjectRecord:
         with Session(repo.engine) as session:
             record = (

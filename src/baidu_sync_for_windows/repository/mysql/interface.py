@@ -33,13 +33,11 @@ from baidu_sync_for_windows.models import (
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
-from baidu_sync_for_windows.logger import get_logger
-from .base import RepositoryStrategyInterface, DTO, Record
+from .base import RepositoryStrategyInterface, DTOClass, Record, DTO
 
 
 import inspect
-from abc import ABC, abstractmethod
-from typing import Dict, Type, Any, Optional
+from typing import Dict
 
 
 # ---------- 策略管理器 ----------
@@ -62,7 +60,7 @@ class StrategyManager:
         """
         self.logger = get_logger(bind={"module_name": self.__class__.__name__})
         self._strategies: Dict[
-            DTO, RepositoryStrategyInterface
+            DTOClass, RepositoryStrategyInterface
         ] = {}  # 入参类型 -> 策略实例
         self._strategy_dir = self._determine_strategy_dir(strategy_dir)
         self.load_strategies()
@@ -147,7 +145,7 @@ class StrategyManager:
         )
 
     def get_strategy(
-        self, dto_class: Type[DTO]
+        self, dto_class: DTOClass
     ) -> Optional[RepositoryStrategyInterface]:
         """根据名称获取策略实例"""
         self.logger.debug(f"根据名称获取策略实例: {dto_class}")
@@ -162,6 +160,7 @@ class StrategyManager:
 
 
 class MysqlRepository(object):
+    engine: Engine
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
         self.logger = get_logger(bind={"repository_name": "mysql"})
@@ -208,7 +207,7 @@ class MysqlRepository(object):
     @overload
     def save(self, data: EncryptNameBackupDTO) -> ObjectEncryptNameBackupRecord: ...
 
-    def save(self, data: DTO) -> Optional[Record]:
+    def save(self, data: DTO) -> Record:
         strategy = self._strategy_manager.get_strategy(type(data))
         if strategy is None:
             self.logger.error(
