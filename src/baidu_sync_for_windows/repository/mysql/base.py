@@ -108,6 +108,9 @@ class RepositoryStrategyInterface(
                 f"insert failed for {self.record_class.__name__}: {e}"
             ) from e
     def _default_update(self, repo: RepositoryProtocol, record: Record_T, data: DTO_T) -> Record_T:
+        if self._default_is_equal(record, data):
+            self.logger.log("MODULE_BASE_INFO", f"record: {record} is equal to data: {data}, no need to update")
+            return record
         with Session(repo.engine) as session:
             for key, value in data.model_dump().items():
                 setattr(record, key, value)
