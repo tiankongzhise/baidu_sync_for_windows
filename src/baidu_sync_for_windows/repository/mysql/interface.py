@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any, Type, Optional, overload
+from typing import Any, Optional, overload, cast
 from pathlib import Path
 from baidu_sync_for_windows.exception import RepositoryException
 from baidu_sync_for_windows.logger import get_logger
@@ -20,14 +20,14 @@ from baidu_sync_for_windows.dtos import (
     EncryptNameBackupDTO,
 )
 from baidu_sync_for_windows.models import (
-    SourceObjectRecord,
-    ObjectCompressRecord,
-    ObjectVerifyRecord,
-    ObjectBackupRecord,
-    ObjectHashRecord,
-    ObjectEncryptNameCompressRecord,
-    ObjectEncryptNameVerifyRecord,
-    ObjectEncryptNameBackupRecord,
+    SourceRecord,
+    CompressRecord,
+    VerifyRecord,
+    BackupRecord,
+    HashRecord,
+    EncryptNameCompressRecord,
+    EncryptNameVerifyRecord,
+    EncryptNameBackupRecord,
     ServiceBase,
 )
 from sqlalchemy import Engine, text
@@ -38,7 +38,7 @@ from .base import RepositoryStrategyInterface, DTOClass, Record, DTO
 
 import inspect
 from typing import Dict
-
+logger = get_logger(bind={"module_name": "MysqlRepository"})
 
 # ---------- 策略管理器 ----------
 class StrategyManager:
@@ -119,7 +119,12 @@ class StrategyManager:
                 continue
 
             # 遍历模块中的属性，找出所有策略类
-            for name, obj in inspect.getmembers(module):
+            for name, obj in inspect.getmembers(module,predicate=inspect.isclass):
+                # 跳过不是模块内的类
+                if obj.__module__ != module.__name__:
+                    self.logger.debug(f"跳过对象: {name}，不是模块内的类")
+                    continue
+
                 if not self._is_strategy_class(obj):
                     self.logger.debug(f"跳过对象: {name}，不是策略类")
                     continue
@@ -145,12 +150,25 @@ class StrategyManager:
         )
 
     def get_strategy(
-        self, dto_class: DTOClass
-    ) -> Optional[RepositoryStrategyInterface]:
-        """根据名称获取策略实例"""
-        self.logger.debug(f"根据名称获取策略实例: {dto_class}")
-        return self._strategies.get(dto_class)
-
+        self, dto_class: DTOClass|None=None
+    ) -> RepositoryStrategyInterface:
+        """根据dto_class获取策略实例,如果dto_class为None,则返回第一个策略实例"""
+        self.logger.debug(f"根据dto_class获取策略实例: {dto_class}")
+        if dto_class is None:
+            defualt_dto_class = self.list_strategies()[0]
+            if not defualt_dto_class:
+                raise RepositoryException("No strategies registered")
+            strategy = self._strategies.get(defualt_dto_class)
+            self.logger.debug(f"get strategy: {strategy}")
+            if strategy is None:
+                raise RepositoryException(f"No strategy registered for DTO type: {defualt_dto_class.__name__}")
+            return cast(RepositoryStrategyInterface, strategy)
+        else:
+            strategy = self._strategies.get(dto_class)
+            self.logger.debug(f"get strategy: {strategy}")
+            if strategy is None:
+                raise RepositoryException(f"No strategy registered for DTO type: {dto_class.__name__}")
+        return strategy
     def list_strategies(self) -> list:
         """返回所有已注册的策略名称列表"""
         self.logger.debug(
@@ -158,14 +176,23 @@ class StrategyManager:
         )
         return list(self._strategies.keys())
 
+strategy_manager = None
+
+def get_strategy_manager() -> StrategyManager:
+    global strategy_manager
+    if strategy_manager is None:
+        strategy_manager = StrategyManager()
+    return strategy_manager
+
 
 class MysqlRepository(object):
     engine: Engine
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
-        self.logger = get_logger(bind={"repository_name": "mysql"})
-        self._strategy_manager = StrategyManager()
+        self.logger = logger
+        self._strategy_manager = get_strategy_manager()
         self._test_connection()
+    # 私有方法
 
     def _test_connection(self) -> None:
         try:
@@ -190,38 +217,7 @@ class MysqlRepository(object):
         self.drop_tables()
         self.create_tables()
 
-    @overload
-    def save(self, data: ScanDTO) -> SourceObjectRecord: ...
-    @overload
-    def save(self, data: CompressDTO) -> ObjectCompressRecord: ...
-    @overload
-    def save(self, data: VerifyDTO) -> ObjectVerifyRecord: ...
-    @overload
-    def save(self, data: BackupDTO) -> ObjectBackupRecord: ...
-    @overload
-    def save(self, data: HashDTO) -> ObjectHashRecord: ...
-    @overload
-    def save(self, data: EncryptNameCompressDTO) -> ObjectEncryptNameCompressRecord: ...
-    @overload
-    def save(self, data: EncryptNameVerifyDTO) -> ObjectEncryptNameVerifyRecord: ...
-    @overload
-    def save(self, data: EncryptNameBackupDTO) -> ObjectEncryptNameBackupRecord: ...
-
-    def save(self, data: DTO) -> Record:
-        strategy = self._strategy_manager.get_strategy(type(data))
-        if strategy is None:
-            self.logger.error(
-                f"No strategy registered for DTO type: {type(data).__name__}. Available strategies: {self._strategy_manager.list_strategies()}"
-            )
-            raise RepositoryException(
-                f"No strategy registered for DTO type: {type(data).__name__}. "
-                f"Available strategies: {self._strategy_manager.list_strategies()}"
-            )
-        result = strategy.save(self, data)
-        self.logger.info(f"save data: {data.model_dump()} result: {result}")
-        return result
-
-    def get_by_id(self, id: int, dto_class: Type[DTO]) -> Optional[Record]:
+    def _get_strategy(self, dto_class: DTOClass) -> RepositoryStrategyInterface:
         strategy = self._strategy_manager.get_strategy(dto_class)
         if strategy is None:
             self.logger.error(
@@ -231,6 +227,98 @@ class MysqlRepository(object):
                 f"No strategy registered for DTO type: {dto_class.__name__}. "
                 f"Available strategies: {self._strategy_manager.list_strategies()}"
             )
-        result = strategy.get_by_source_object_id(self, id)
-        self.logger.info(f"get by id: {id} result: {result}")
+        return strategy
+    # 重载定义区域
+    @overload
+    def save(self, data: ScanDTO) -> SourceRecord: ...
+    @overload
+    def save(self, data: CompressDTO) -> CompressRecord: ...
+    @overload
+    def save(self, data: VerifyDTO) -> VerifyRecord: ...
+    @overload
+    def save(self, data: BackupDTO) -> BackupRecord: ...
+    @overload
+    def save(self, data: HashDTO) -> HashRecord: ...
+    @overload
+    def save(self, data: EncryptNameCompressDTO) -> EncryptNameCompressRecord: ...
+    @overload
+    def save(self, data: EncryptNameVerifyDTO) -> EncryptNameVerifyRecord: ...
+    @overload
+    def save(self, data: EncryptNameBackupDTO) -> EncryptNameBackupRecord: ...
+
+
+    @overload
+    def get_source_record_by_source_id(self, dto_class: type[ScanDTO],id: int) -> Optional[SourceRecord]: ...
+    @overload
+    def get_source_record_by_source_id(self, dto_class: type[CompressDTO],id: int) -> Optional[SourceRecord]: ...
+    @overload
+    def get_source_record_by_source_id(self, dto_class: type[VerifyDTO],id: int) -> Optional[SourceRecord]: ...
+    @overload
+    def get_source_record_by_source_id(self, dto_class: type[BackupDTO],id: int) -> Optional[SourceRecord]: ...
+    @overload
+    def get_source_record_by_source_id(self, dto_class: type[HashDTO],id: int) -> Optional[SourceRecord]: ...
+    @overload
+    def get_source_record_by_source_id(self, dto_class: type[EncryptNameCompressDTO],id: int) -> Optional[SourceRecord]: ...
+    @overload
+    def get_source_record_by_source_id(self, dto_class: type[EncryptNameVerifyDTO],id: int) -> Optional[SourceRecord]: ...
+    @overload
+    def get_source_record_by_source_id(self, dto_class: type[EncryptNameBackupDTO],id: int) -> Optional[SourceRecord]: ...
+
+    @overload
+    def get_latest_service_record_by_source_id(self, dto_class: type[ScanDTO],id: int) -> Optional[SourceRecord]: ...
+    @overload
+    def get_latest_service_record_by_source_id(self, dto_class: type[HashDTO],id: int) -> Optional[SourceRecord]: ...
+    @overload
+    def get_latest_service_record_by_source_id(self, dto_class: type[CompressDTO],id: int) -> Optional[HashRecord]: ...
+    @overload
+    def get_latest_service_record_by_source_id(self, dto_class: type[VerifyDTO],id: int) -> Optional[CompressRecord]: ...
+    @overload
+    def get_latest_service_record_by_source_id(self, dto_class: type[BackupDTO],id: int) -> Optional[VerifyRecord]: ...
+    @overload
+    def get_latest_service_record_by_source_id(self, dto_class: type[EncryptNameCompressDTO],id: int) -> Optional[HashRecord]: ...
+    @overload
+    def get_latest_service_record_by_source_id(self, dto_class: type[EncryptNameVerifyDTO],id: int) -> Optional[EncryptNameCompressRecord]: ...
+    @overload
+    def get_latest_service_record_by_source_id(self, dto_class: type[EncryptNameBackupDTO],id: int) -> Optional[EncryptNameVerifyRecord]: ...
+
+    @overload
+    def get_record_by_source_id(self, dto_class: type[ScanDTO],id: int) -> Optional[SourceRecord]: ...
+    @overload
+    def get_record_by_source_id(self, dto_class: type[HashDTO],id: int) -> Optional[HashRecord]: ...
+    @overload
+    def get_record_by_source_id(self, dto_class: type[CompressDTO],id: int) -> Optional[CompressRecord]: ...
+    @overload
+    def get_record_by_source_id(self, dto_class: type[VerifyDTO],id: int) -> Optional[VerifyRecord]: ...
+    @overload
+    def get_record_by_source_id(self, dto_class: type[BackupDTO],id: int) -> Optional[BackupRecord]: ...
+    @overload
+    def get_record_by_source_id(self, dto_class: type[EncryptNameCompressDTO],id: int) -> Optional[EncryptNameCompressRecord]: ...
+    @overload
+    def get_record_by_source_id(self, dto_class: type[EncryptNameVerifyDTO],id: int) -> Optional[EncryptNameVerifyRecord]: ...
+    @overload
+    def get_record_by_source_id(self, dto_class: type[EncryptNameBackupDTO],id: int) -> Optional[EncryptNameBackupRecord]: ...
+    # 重载实现区域
+
+    def save(self, data: DTO) -> Record:
+        strategy = self._get_strategy(type(data))
+        result = strategy.save(self, data)
+        self.logger.log("MODULE_INFO",f"save data: {data.model_dump()} result: {result}")
         return result
+
+    def get_source_record_by_source_id(self, dto_class: DTOClass,id: int) -> Optional[Record]:
+        strategy = self._get_strategy(dto_class)
+        result = strategy.get_source_record_by_source_id(self, id)
+        self.logger.log("MODULE_INFO",f"get source record by source id: {id} result: {result}")
+        return result
+    def get_latest_service_record_by_source_id(self, dto_class: DTOClass,id: int) -> Optional[Record]:
+        strategy = self._get_strategy(dto_class)
+        result = strategy.get_latest_service_record_by_source_id(self, id)
+        self.logger.log("MODULE_INFO",f"get latest service record by source id: {id} result: {result}")
+        return result
+    def get_record_by_source_id(self, dto_class: DTOClass,id: int) -> Optional[Record]:
+        strategy = self._get_strategy(dto_class)
+        result = strategy.get_record_by_source_id(self, id)
+        self.logger.log("MODULE_INFO",f"get record by source id: {id} result: {result}")
+        return result
+    
+

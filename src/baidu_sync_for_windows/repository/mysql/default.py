@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from baidu_sync_for_windows.config import get_config
 from .interface import MysqlRepository
 DefaultRepository = MysqlRepository
-def get_default_repository()->MysqlRepository:
+def create_default_repository()->MysqlRepository:
     config = get_config()
     database = config.database.database_config.database 
     connector = config.database.database_config.connector
@@ -19,3 +19,9 @@ def get_default_repository()->MysqlRepository:
     repository.create_tables()
     return repository
 
+default_repository = None
+def get_default_repository()->MysqlRepository:
+    global default_repository
+    if default_repository is None:
+        default_repository = create_default_repository()
+    return default_repository

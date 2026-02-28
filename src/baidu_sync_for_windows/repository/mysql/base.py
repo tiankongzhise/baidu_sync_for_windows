@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing_extensions import TypeAlias
 from sqlalchemy.orm import Session
-from sqlalchemy import text, Engine
-from typing import Any, Generic, Sequence, TypeVar
+from sqlalchemy import Engine
+from typing import Generic, TypeVar
 from typing import Type, cast, Protocol
 from baidu_sync_for_windows.exception import RepositoryException
 from baidu_sync_for_windows.dtos import (
@@ -16,14 +16,14 @@ from baidu_sync_for_windows.dtos import (
     EncryptNameBackupDTO,
 )
 from baidu_sync_for_windows.models import (
-    SourceObjectRecord,
-    ObjectCompressRecord,
-    ObjectVerifyRecord,
-    ObjectBackupRecord,
-    ObjectHashRecord,
-    ObjectEncryptNameCompressRecord,
-    ObjectEncryptNameVerifyRecord,
-    ObjectEncryptNameBackupRecord,
+    SourceRecord,
+    CompressRecord,
+    VerifyRecord,
+    BackupRecord,
+    HashRecord,
+    EncryptNameCompressRecord,
+    EncryptNameVerifyRecord,
+    EncryptNameBackupRecord,
 )
 from baidu_sync_for_windows.logger import get_logger
 
@@ -39,14 +39,14 @@ DTO: TypeAlias = (
 )
 
 Record: TypeAlias = (
-    SourceObjectRecord
-    | ObjectCompressRecord
-    | ObjectVerifyRecord
-    | ObjectBackupRecord
-    | ObjectHashRecord
-    | ObjectEncryptNameCompressRecord
-    | ObjectEncryptNameVerifyRecord
-    | ObjectEncryptNameBackupRecord
+    SourceRecord
+    | CompressRecord
+    | VerifyRecord
+    | BackupRecord
+    | HashRecord
+    | EncryptNameCompressRecord
+    | EncryptNameVerifyRecord
+    | EncryptNameBackupRecord
 )
 
 DTOClass: TypeAlias = Type[DTO]
@@ -55,100 +55,154 @@ RecordClass: TypeAlias = Type[Record]
 # 泛型形参：子类可指定具体的 DTO / Record，使重写方法类型兼容
 DTO_T = TypeVar("DTO_T", bound=DTO)
 Record_T = TypeVar("Record_T", bound=Record)
+SourceRecord_T = TypeVar("SourceRecord_T", bound=Record)
+LastServiceRecord_T = TypeVar("LastServiceRecord_T", bound=Record)
+
 
 class RepositoryProtocol(Protocol):
     engine: Engine
 
-class RepositoryStrategyInterface(ABC, Generic[DTO_T, Record_T]):
+
+class RepositoryStrategyInterface(
+    ABC, Generic[DTO_T, Record_T, SourceRecord_T, LastServiceRecord_T]
+):
     """策略接口。子类继承时指定 Generic 参数可获得具体 DTO/Record 类型，重写方法类型兼容。"""
 
-    def __init__(self, record_class: Type[Record_T], dto_class: Type[DTO_T]):
-        self.record_class = record_class
+    def __init__(
+        self,
+        dto_class: Type[DTO_T],
+        record_class: Type[Record_T],
+        source_record_class: Type[SourceRecord_T],
+        last_service_record_class: Type[LastServiceRecord_T],
+    ):
         self.dto_class = dto_class
+        self.record_class = record_class
+        self.source_record_class = source_record_class
+        self.last_service_record_class = last_service_record_class
         self.logger = get_logger(bind={"module_name": self.__class__.__name__})
 
-    @abstractmethod
-    def insert(self, repo: RepositoryProtocol, data: DTO_T) -> Record_T:
+
+    def _default_insert(self, repo: RepositoryProtocol, data: DTO_T) -> Record_T:
         with Session(repo.engine) as session:
             record = self.record_class(**data.model_dump())
             session.add(record)
             session.commit()
             session.refresh(record)
             session.expunge(record)
-            self.logger.log("MODULE_BASE_INFO", f"insert data: {data.model_dump()}")
+            self.logger.log("MODULE_BASE_INFO", f"insert data: {data.model_dump()}, record: {record}")
             return cast(Record_T, record)
-
-    @abstractmethod
-    def update(self, repo: RepositoryProtocol, data: DTO_T) -> Record_T:
+    def _default_update(self, repo: RepositoryProtocol, record: Record_T, data: DTO_T) -> Record_T:
         with Session(repo.engine) as session:
-            record = self.get_by_source_object_id(repo, data.source_object_id)  # type: ignore
             for key, value in data.model_dump().items():
-                if key == "source_object_id":
-                    continue
                 setattr(record, key, value)
             session.merge(record)
             session.commit()
-            session.refresh(record)
-            session.expunge(record)
-            self.logger.log("MODULE_BASE_INFO", f"update data: {data.model_dump()}")
+            self.logger.log("MODULE_BASE_INFO", f"update data: {data.model_dump()}, record: {record}")
             return cast(Record_T, record)
 
+
     @abstractmethod
-    def get_by_source_object_id(self, repo: RepositoryProtocol, source_object_id: Any) -> Record_T | None:
+    def get_source_record_by_source_id(
+        self, repo: RepositoryProtocol, source_id: int
+    ) -> SourceRecord_T | None: ...
+    def _default_get_source_record_by_source_id(
+        self, repo: RepositoryProtocol, source_id: int
+    ) -> SourceRecord_T | None:
         with Session(repo.engine) as session:
             record = (
-                session.query(self.record_class)
+                session.query(self.source_record_class)
+                .filter(getattr(self.source_record_class, "id") == source_id)
+                .first()
+            )
+            if record:
+                self.logger.log(
+                    "MODULE_BASE_INFO",
+                    f"get source object record by id: {source_id}",
+                )
+                return cast(SourceRecord_T, record)
+            self.logger.log(
+                "MODULE_BASE_INFO",
+                f"get source object record by id: {source_id} not found",
+            )
+            return None
+
+    @abstractmethod
+    def get_latest_service_record_by_source_id(
+        self, repo: RepositoryProtocol, source_id: int
+    ) -> LastServiceRecord_T | None: ...
+    def _default_get_latest_service_record_by_source_id(
+        self, repo: RepositoryProtocol, source_id: int
+    ) -> LastServiceRecord_T | None:
+        with Session(repo.engine) as session:
+            record = (
+                session.query(self.last_service_record_class)
                 .filter(
-                    getattr(self.record_class, "source_object_id") == source_object_id
+                    getattr(self.last_service_record_class, "source_id")
+                    == source_id
                 )
                 .first()
             )
             if record:
                 self.logger.log(
-                    "MODULE_BASE_INFO", f"get by source object id: {source_object_id}"
+                    "MODULE_BASE_INFO",
+                    f"get last service record by id: {source_id}",
+                )
+                return cast(LastServiceRecord_T, record)
+            self.logger.log(
+                "MODULE_BASE_INFO",
+                f"get last service record by id: {source_id} not found",
+            )
+            return None
+    @abstractmethod
+    def get_record_by_source_id(
+        self, repo: RepositoryProtocol, source_id: int
+    ) -> Record_T | None: ...
+    def _default_get_record_by_source_id(
+        self, repo: RepositoryProtocol, source_id: int
+    ) -> Record_T | None:
+        with Session(repo.engine) as session:
+            record = (
+                session.query(self.record_class)
+                .filter(
+                    getattr(self.record_class, "source_id") == source_id
+                )
+                .first()
+            )
+            if record:
+                self.logger.log(
+                    "MODULE_BASE_INFO",
+                    f"get record by source id: {source_id}",
                 )
                 return cast(Record_T, record)
             self.logger.log(
                 "MODULE_BASE_INFO",
-                f"get by source object id: {source_object_id} not found",
+                f"get record by source id: {source_id} not found",
             )
             return None
 
     @abstractmethod
-    def save(self, repo: RepositoryProtocol, data: DTO_T) -> Record_T:
-        if getattr(data, "source_object_id", None) is None:
+    def save(self, repo: RepositoryProtocol, data: DTO_T) -> Record_T: ...
+    def _default_save(self, repo: RepositoryProtocol, data: DTO_T) -> Record_T:
+        if getattr(data, "source_id", None) is None:
             self.logger.error(
-                f"save failed: Source object id is required, data: {data}"
+                f"save failed: Source id is required, data: {data}"
             )
             raise RepositoryException(
-                f"base strategy save failed: Source object id is required, data: {data}"
+                f"base strategy save failed: Source id is required, data: {data}"
             )
-        record = self.get_by_source_object_id(repo, data.source_object_id)  # type: ignore
+        record = self._default_get_record_by_source_id(repo,getattr(data, "source_id"))  
         if not record:
             self.logger.log(
                 "MODULE_BASE_INFO", f"save: insert data: {data.model_dump()}"
             )
-            return self.insert(repo, data)
-        if self.is_equal(record, data):
-            self.logger.log(
-                "MODULE_BASE_INFO",
-                f"save: record is equal to data: {data.model_dump()}",
-            )
-            return record
+            return self._default_insert(repo, data)
+        result = self._default_update(repo, record,data)
         self.logger.log("MODULE_BASE_INFO", f"save: update data: {data.model_dump()}")
-        return self.update(repo, data)
+        return result
 
-    @abstractmethod
-    def execute(self, repo: RepositoryProtocol, query: str) -> Sequence[Any] | None:
-        with Session(repo.engine) as session:
-            result = session.execute(text(query)).all()
-            self.logger.log(
-                "MODULE_BASE_INFO", f"execute query: {query} result: {result}"
-            )
-            return result
 
-    @abstractmethod
-    def is_equal(self, record: Record_T, data: DTO_T) -> bool:
+
+    def _default_is_equal(self, record: Record_T, data: DTO_T) -> bool:
         for key, value in data.model_dump().items():
             if getattr(record, key) != value:
                 self.logger.debug(
