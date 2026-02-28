@@ -107,11 +107,21 @@ class StrategyManager:
         if force_reload:
             self._strategies.clear()
 
-        # 遍历指定目录下所有匹配后缀的文件，按包内子模块加载以支持相对引用
+        # 收集所有策略文件并按解析后的路径去重，避免 Windows 等环境下同一文件被 glob 返回多次
+        seen_resolved: set[Path] = set()
+        strategy_files: list[Path] = []
         for file_path in self._strategy_dir.glob("*.py"):
             if self.STRATEGY_FILE_SUFFIX not in file_path.name:
                 self.logger.debug(f"跳过文件: {file_path.name}，不是策略文件")
                 continue
+            resolved = file_path.resolve()
+            if resolved in seen_resolved:
+                self.logger.debug(f"跳过重复路径: {file_path.name}")
+                continue
+            seen_resolved.add(resolved)
+            strategy_files.append(file_path)
+
+        for file_path in strategy_files:
             module_name = file_path.stem
             module = self._load_strategy_module(module_name)
             if module is None:

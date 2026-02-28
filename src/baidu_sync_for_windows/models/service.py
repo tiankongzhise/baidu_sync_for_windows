@@ -24,7 +24,7 @@ class SourceRecord(ServiceBase):
 class HashRecord(ServiceBase):
     __tablename__ = "hash_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
-    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="hash_records")
+    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="hash_records", init=False)
     md5: Mapped[str] = mapped_column(String(32),nullable=True)
     sha1: Mapped[str] = mapped_column(String(40),nullable=True)
     sha256: Mapped[str] = mapped_column(String(64),nullable=True)
@@ -37,7 +37,7 @@ class HashRecord(ServiceBase):
 class CompressRecord(ServiceBase):
     __tablename__ = "compress_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
-    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="compress_records")
+    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="compress_records", init=False)
     compress_object_path: Mapped[str] = mapped_column(String(255))
     __table_args__ = (
             UniqueConstraint("source_id",name="uix_source_id"),
@@ -47,7 +47,7 @@ class CompressRecord(ServiceBase):
 class EncryptNameCompressRecord(ServiceBase):
     __tablename__ = "encrypt_name_compress_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
-    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="encrypt_name_compress_records")
+    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="encrypt_name_compress_records", init=False)
     encrypt_name_compress_object_path: Mapped[str] = mapped_column(String(255))
     __table_args__ = (
         UniqueConstraint("source_id",name="uix_source_id"),
@@ -57,7 +57,7 @@ class EncryptNameCompressRecord(ServiceBase):
 class VerifyRecord(ServiceBase):
     __tablename__ = "verify_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
-    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="verify_records")
+    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="verify_records", init=False)
     verify_object_path: Mapped[str] = mapped_column(String(255))
     __table_args__ = (
         UniqueConstraint("source_id",name="uix_source_id"),
@@ -67,7 +67,7 @@ class VerifyRecord(ServiceBase):
 class EncryptNameVerifyRecord(ServiceBase):
     __tablename__ = "encrypt_name_verify_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
-    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="encrypt_name_verify_records")
+    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="encrypt_name_verify_records", init=False)
     encrypt_name_verify_object_path: Mapped[str] = mapped_column(String(255))
     __table_args__ = (
             UniqueConstraint("source_id",name="uix_source_id"),
@@ -77,7 +77,7 @@ class EncryptNameVerifyRecord(ServiceBase):
 class BackupRecord(ServiceBase):
     __tablename__ = "backup_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
-    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="backup_records")
+    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="backup_records", init=False)
     backup_object_path: Mapped[str] = mapped_column(String(255))
     backup_object_hash: Mapped[str] = mapped_column(String(32))
     __table_args__ = (
@@ -89,7 +89,7 @@ class BackupRecord(ServiceBase):
 class EncryptNameBackupRecord(ServiceBase):
     __tablename__ = "encrypt_name_backup_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
-    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="encrypt_name_backup_records")
+    source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="encrypt_name_backup_records", init=False)
     encrypt_name_backup_object_path: Mapped[str] = mapped_column(String(255))
     encrypt_name_backup_object_hash: Mapped[str] = mapped_column(String(32))
     __table_args__ = (

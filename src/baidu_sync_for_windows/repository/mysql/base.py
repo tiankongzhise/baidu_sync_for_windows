@@ -83,14 +83,30 @@ class RepositoryStrategyInterface(
 
 
     def _default_insert(self, repo: RepositoryProtocol, data: DTO_T) -> Record_T:
-        with Session(repo.engine) as session:
-            record = self.record_class(**data.model_dump())
-            session.add(record)
-            session.commit()
-            session.refresh(record)
-            session.expunge(record)
-            self.logger.log("MODULE_BASE_INFO", f"insert data: {data.model_dump()}, record: {record}")
-            return cast(Record_T, record)
+        if type(data) is not self.dto_class:
+            self.logger.error(
+                f"DTO type mismatch: expected {self.dto_class.__name__}, got {type(data).__name__}. "
+                "Wrong strategy may write to wrong table."
+            )
+            raise RepositoryException(
+                f"DTO type mismatch: strategy is for {self.dto_class.__name__}, got {type(data).__name__}"
+            )
+        try:
+            with Session(repo.engine) as session:
+                record = self.record_class(**data.model_dump())
+                session.add(record)
+                session.commit()
+                session.refresh(record)
+                session.expunge(record)
+                self.logger.log("MODULE_BASE_INFO", f"insert data: {data.model_dump()}, record: {record}")
+                return cast(Record_T, record)
+        except Exception as e:
+            self.logger.exception(
+                f"insert failed for {self.record_class.__name__}, data={data.model_dump()}: {e}"
+            )
+            raise RepositoryException(
+                f"insert failed for {self.record_class.__name__}: {e}"
+            ) from e
     def _default_update(self, repo: RepositoryProtocol, record: Record_T, data: DTO_T) -> Record_T:
         with Session(repo.engine) as session:
             for key, value in data.model_dump().items():

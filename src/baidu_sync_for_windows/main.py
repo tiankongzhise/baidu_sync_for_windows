@@ -68,9 +68,14 @@ def start_consumer(consumer_worker:Callable,repository:DefaultRepository,disk_sp
     return consumer_thread
 
 def start_producer(producer_worker:Callable,source_object_ids:list[int],repository:DefaultRepository,disk_space_coordinator:DiskSpaceCoordinator):
+    """提交生产者任务并等待全部完成；任一任务抛异常会在此处抛出，避免异常被线程池吞掉。"""
     with ThreadPoolExecutor(max_workers=4) as executor:
-        for source_object_id in source_object_ids:
-            executor.submit(producer_worker,source_object_id,repository,disk_space_coordinator)
+        futures = [
+            executor.submit(producer_worker, source_object_id, repository, disk_space_coordinator)
+            for source_object_id in source_object_ids
+        ]
+        for future in futures:
+            future.result()  # 使工作线程中的异常抛到主线程，否则 save() 失败会静默
 
 def wait_for_complete(consumer_thread:threading.Thread,consumer_queue:queue.Queue):
     consumer_queue.join()

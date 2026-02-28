@@ -5,11 +5,13 @@ from baidu_sync_for_windows.logger import get_logger
 from .base import RepositoryStrategyInterface, RepositoryProtocol
 
 
-class Scanstrategy(
+class HashStrategy(
     RepositoryStrategyInterface[
         HashDTO, HashRecord, SourceRecord, SourceRecord
     ]
 ):
+    """HashDTO 的仓储策略，对应 HashRecord / hash_record 表。"""
+
     def __init__(self) -> None:
         super().__init__(
             HashDTO, HashRecord, SourceRecord, SourceRecord
