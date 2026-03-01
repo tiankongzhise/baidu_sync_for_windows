@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import queue
 import threading
 from typing import Callable
-from baidu_sync_for_windows.service import scan_service,compress_object,verify_object,backup_object,DiskSpaceCoordinator,hash_service
+from baidu_sync_for_windows.service import scan_service,compress_service,verify_service,backup_object,DiskSpaceCoordinator,hash_service
 from baidu_sync_for_windows.repository import get_default_repository,DefaultRepository
 from baidu_sync_for_windows.config import get_config
 from baidu_sync_for_windows.dtos import ScanDTO
@@ -15,10 +15,10 @@ def sync_object_producer(source_object_id:int,repository:DefaultRepository,disk_
     _,hash_result = hash_service(source_object_id)
     if hash_result:
         repository.save(hash_result)
-    _,compress_result = compress_object(source_object_id,disk_space_coordinator)
+    _,compress_result = compress_service(source_object_id,disk_space_coordinator)
     if compress_result:
         repository.save(compress_result)
-    verify_result = verify_object(source_object_id,disk_space_coordinator)
+    _,verify_result = verify_service(source_object_id,disk_space_coordinator)
     if verify_result:
         repository.save(verify_result)
         backup_queue.put(source_object_id)
@@ -29,9 +29,14 @@ def sync_object_consumer(repository:DefaultRepository,disk_space_coordinator:Dis
         if source_object_id is END_OF_QUEUE:
             print("Received END_OF_QUEUE, terminating consumer thread")
             break
-        backup_result = backup_object(source_object_id,disk_space_coordinator)
-        repository.save(backup_result)
-        backup_queue.task_done()
+        try:
+            backup_result = backup_object(source_object_id,disk_space_coordinator)
+            repository.save(backup_result)
+        except Exception as e:
+            logger.error(f"save backup_result failed: {e}")
+            traceback.print_exc()
+        finally:
+            backup_queue.task_done()
 
 
 def get_dependency():
