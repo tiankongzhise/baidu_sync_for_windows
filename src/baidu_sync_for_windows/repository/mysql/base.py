@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing_extensions import TypeAlias
 from sqlalchemy.orm import Session
-from sqlalchemy import Engine
-from typing import Generic, TypeVar
+from sqlalchemy import Engine,TextClause
+from typing import Generic, TypeVar, Any
 from typing import Type, cast, Protocol
 from baidu_sync_for_windows.exception import RepositoryException
 from baidu_sync_for_windows.dtos import (
@@ -230,3 +230,14 @@ class RepositoryStrategyInterface(
                 return False
         self.logger.debug(f"record:{record} is equal to dto:{data}")
         return True
+
+    def _default_execute_sql(self, repo: RepositoryProtocol, sql: TextClause, *args, **kwargs) -> Any:
+        """执行原生 SQL，*args/**kwargs 会合并为绑定参数透传给 session.execute(statement, parameters)。"""
+        params: dict[str, Any] = {}
+        if len(args) == 1 and isinstance(args[0], dict):
+            params = dict(args[0])
+        params.update(kwargs)
+        with Session(repo.engine) as session:
+            return session.execute(sql, params)
+    @abstractmethod
+    def is_processed(self, repo: RepositoryProtocol, source_id: int) -> bool:...

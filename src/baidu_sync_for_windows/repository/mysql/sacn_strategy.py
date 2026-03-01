@@ -6,7 +6,7 @@ from baidu_sync_for_windows.logger import get_logger
 from .base import RepositoryStrategyInterface, RepositoryProtocol
 
 
-class Scanstrategy(
+class ScanStrategy(
     RepositoryStrategyInterface[
         ScanDTO, SourceRecord, SourceRecord, SourceRecord
     ]
@@ -27,6 +27,8 @@ class Scanstrategy(
     def get_record_by_source_id(self, repo: RepositoryProtocol, source_id: int) -> SourceRecord | None:
         self.logger.warning('scan repository has no source id,because source id is the key of source record, use id instead')
         return self._get_record_by_id(repo, source_id)
+    def is_processed(self, repo: RepositoryProtocol, source_id: int) -> bool:
+        return False
 
     def _get_record_by_id(self, repo: RepositoryProtocol, id: int) -> SourceRecord | None:
         with Session(repo.engine) as session:
@@ -49,5 +51,5 @@ class Scanstrategy(
 
 
 if __name__ == "__main__":
-    strategy = Scanstrategy()
+    strategy = ScanStrategy()
     print(strategy.dto_class)

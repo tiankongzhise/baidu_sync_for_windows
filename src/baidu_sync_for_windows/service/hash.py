@@ -17,6 +17,9 @@ logger = get_logger(bind={"service_name": "hash_service"})
 
 def hash_service(source_id: int) -> tuple[int, HashDTO | None]:
     repository = get_default_repository()
+    if repository.is_processed(HashDTO, source_id):
+        logger.info(f"source id: {source_id} is already hashed, skip hash")
+        return source_id, None
     record = repository.get_source_record_by_source_id(HashDTO, source_id)
     if record is None:
         raise ValueError(f"source id: {source_id} not found")

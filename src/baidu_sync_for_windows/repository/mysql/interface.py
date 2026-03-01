@@ -4,9 +4,12 @@
 
 from __future__ import annotations
 
-import importlib
-from typing import Any, Optional, overload, cast
-from pathlib import Path
+# import importlib
+# from pathlib import Path
+# from typing import  Any, cast
+
+from typing import Optional, overload
+
 from baidu_sync_for_windows.exception import RepositoryException
 from baidu_sync_for_windows.logger import get_logger
 from baidu_sync_for_windows.dtos import (
@@ -34,157 +37,178 @@ from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
 from .base import RepositoryStrategyInterface, DTOClass, Record, DTO
+from .sacn_strategy import ScanStrategy
+from .hash_strategy import HashStrategy
 
-
-import inspect
-from typing import Dict
+# import inspect
+# from typing import Dict
 logger = get_logger(bind={"module_name": "MysqlRepository"})
 
 # ---------- 策略管理器 ----------
+# class StrategyManager:
+#     """
+#     策略管理器，负责动态加载策略文件并管理策略实例。
+
+#     策略文件存放位置：默认位于本模块所在目录下的 'strategies' 子目录，
+#     如果该目录不存在，则直接使用本模块所在目录。
+#     文件名必须以 '_strategy.py' 结尾（可通过类属性修改）。
+#     """
+
+#     # 策略文件的后缀，可被子类覆盖
+#     STRATEGY_FILE_SUFFIX = "_strategy.py"
+
+#     def __init__(self, strategy_dir: Optional[str] = None):
+#         """
+#         初始化策略管理器。
+#         :param strategy_dir: 策略文件所在目录。若为 None，则自动定位。
+#         """
+#         self.logger = get_logger(bind={"module_name": self.__class__.__name__})
+#         self._strategies: Dict[
+#             DTOClass, RepositoryStrategyInterface
+#         ] = {}  # 入参类型 -> 策略实例
+#         self._strategy_dir = self._determine_strategy_dir(strategy_dir)
+#         self.load_strategies()
+
+#     def _determine_strategy_dir(self, custom_dir: Optional[str]) -> Path:
+#         """确定策略文件所在的目录"""
+#         if custom_dir:
+#             self.logger.info(f"确定策略文件所在的目录: {custom_dir}")
+#             return Path(custom_dir)
+#         self.logger.info(f"确定策略文件所在的目录: {Path(__file__).parent}")
+#         return Path(__file__).parent
+
+#     def _is_strategy_class(self, obj: Any) -> bool:
+#         """判断一个对象是否为合法的策略类（继承自 Strategy 且非抽象）"""
+
+#         result = (
+#             inspect.isclass(obj)
+#             and issubclass(obj, RepositoryStrategyInterface)
+#             and obj is not RepositoryStrategyInterface
+#             and not inspect.isabstract(obj)
+#         )
+#         self.logger.debug(f"判断一个对象是否为合法的策略类: {obj}: {result}")
+#         return result
+
+#     def _load_strategy_module(self, module_name: str):
+#         """
+#         以当前包子模块方式加载策略模块，使模块内相对引用（如 from .base import ...）生效。
+#         返回加载的模块，失败返回 None。
+#         """
+#         # 使用包内子模块名加载，保证相对导入有父包
+#         full_module_name = f"{__package__}.{module_name}"
+#         try:
+#             self.logger.info(f"加载模块: {full_module_name}")
+#             return importlib.import_module(full_module_name)
+#         except Exception as e:
+#             self.logger.error(f"加载模块 {full_module_name} 时出错：{e}")
+#             return None
+
+#     def load_strategies(self, force_reload: bool = False) -> None:
+#         """
+#         加载所有策略文件中的策略类并注册为实例。
+#         :param force_reload: 是否强制重新加载（清空现有策略）
+#         """
+#         if force_reload:
+#             self._strategies.clear()
+
+#         # 收集所有策略文件并按解析后的路径去重，避免 Windows 等环境下同一文件被 glob 返回多次
+#         seen_resolved: set[Path] = set()
+#         strategy_files: list[Path] = []
+#         for file_path in self._strategy_dir.glob("*.py"):
+#             if self.STRATEGY_FILE_SUFFIX not in file_path.name:
+#                 self.logger.debug(f"跳过文件: {file_path.name}，不是策略文件")
+#                 continue
+#             resolved = file_path.resolve()
+#             if resolved in seen_resolved:
+#                 self.logger.debug(f"跳过重复路径: {file_path.name}")
+#                 continue
+#             seen_resolved.add(resolved)
+#             strategy_files.append(file_path)
+
+#         for file_path in strategy_files:
+#             module_name = file_path.stem
+#             module = self._load_strategy_module(module_name)
+#             if module is None:
+#                 self.logger.error(f"加载模块 {module_name} 时出错：{module}")
+#                 continue
+
+#             # 遍历模块中的属性，找出所有策略类
+#             for name, obj in inspect.getmembers(module,predicate=inspect.isclass):
+#                 # 跳过不是模块内的类
+#                 if obj.__module__ != module.__name__:
+#                     self.logger.debug(f"跳过对象: {name}，不是模块内的类")
+#                     continue
+
+#                 if not self._is_strategy_class(obj):
+#                     self.logger.debug(f"跳过对象: {name}，不是策略类")
+#                     continue
+
+#                 # 实例化策略（假定无参构造）
+#                 try:
+#                     strategy_instance = obj()
+#                     self.logger.info(f"实例化策略类: {obj.__name__}")
+#                 except Exception as e:
+#                     self.logger.error(f"实例化策略类 {obj.__name__} 时出错：{e}")
+#                     continue
+
+#                 # 注册：使用策略对象的 dto_class 属性作为键
+#                 key = strategy_instance.dto_class
+#                 if key in self._strategies:
+#                     self.logger.warning(
+#                         f"警告：策略 dto_class '{key}' 重复，后面的将覆盖前面的"
+#                     )
+#                 self._strategies[key] = strategy_instance
+
+#         self.logger.info(
+#             f"策略加载完成，共 {len(self._strategies)} 个策略：{list(self._strategies.keys())}"
+#         )
+    
+
+#     def get_strategy(
+#         self, dto_class: DTOClass|None=None
+#     ) -> RepositoryStrategyInterface:
+#         """根据dto_class获取策略实例,如果dto_class为None,则返回第一个策略实例"""
+#         self.logger.debug(f"根据dto_class获取策略实例: {dto_class}")
+#         if dto_class is None:
+#             defualt_dto_class = self.list_strategies()[0]
+#             if not defualt_dto_class:
+#                 raise RepositoryException("No strategies registered")
+#             strategy = self._strategies.get(defualt_dto_class)
+#             self.logger.debug(f"get strategy: {strategy}")
+#             if strategy is None:
+#                 raise RepositoryException(f"No strategy registered for DTO type: {defualt_dto_class.__name__}")
+#             return cast(RepositoryStrategyInterface, strategy)
+#         else:
+#             strategy = self._strategies.get(dto_class)
+#             self.logger.debug(f"get strategy: {strategy}")
+#             if strategy is None:
+#                 raise RepositoryException(f"No strategy registered for DTO type: {dto_class.__name__}")
+#         return strategy
+#     def list_strategies(self) -> list:
+#         """返回所有已注册的策略名称列表"""
+#         self.logger.debug(
+#             f"返回所有已注册的策略名称列表: {list(self._strategies.keys())}"
+#         )
+#         return list(self._strategies.keys())
 class StrategyManager:
-    """
-    策略管理器，负责动态加载策略文件并管理策略实例。
+    def __init__(self):
+        self._strategies:dict[DTOClass,RepositoryStrategyInterface] = {
+            ScanDTO: ScanStrategy(),
+            HashDTO: HashStrategy(),
+        }
+    @overload
+    def get_strategy(self,dto_class:type[ScanDTO]) -> ScanStrategy:...
+    @overload
+    def get_strategy(self,dto_class:type[HashDTO]) -> HashStrategy:...
+    @overload
+    def get_strategy(self, dto_class: DTOClass) -> RepositoryStrategyInterface: ...
 
-    策略文件存放位置：默认位于本模块所在目录下的 'strategies' 子目录，
-    如果该目录不存在，则直接使用本模块所在目录。
-    文件名必须以 '_strategy.py' 结尾（可通过类属性修改）。
-    """
-
-    # 策略文件的后缀，可被子类覆盖
-    STRATEGY_FILE_SUFFIX = "_strategy.py"
-
-    def __init__(self, strategy_dir: Optional[str] = None):
-        """
-        初始化策略管理器。
-        :param strategy_dir: 策略文件所在目录。若为 None，则自动定位。
-        """
-        self.logger = get_logger(bind={"module_name": self.__class__.__name__})
-        self._strategies: Dict[
-            DTOClass, RepositoryStrategyInterface
-        ] = {}  # 入参类型 -> 策略实例
-        self._strategy_dir = self._determine_strategy_dir(strategy_dir)
-        self.load_strategies()
-
-    def _determine_strategy_dir(self, custom_dir: Optional[str]) -> Path:
-        """确定策略文件所在的目录"""
-        if custom_dir:
-            self.logger.info(f"确定策略文件所在的目录: {custom_dir}")
-            return Path(custom_dir)
-        self.logger.info(f"确定策略文件所在的目录: {Path(__file__).parent}")
-        return Path(__file__).parent
-
-    def _is_strategy_class(self, obj: Any) -> bool:
-        """判断一个对象是否为合法的策略类（继承自 Strategy 且非抽象）"""
-
-        result = (
-            inspect.isclass(obj)
-            and issubclass(obj, RepositoryStrategyInterface)
-            and obj is not RepositoryStrategyInterface
-            and not inspect.isabstract(obj)
-        )
-        self.logger.debug(f"判断一个对象是否为合法的策略类: {obj}: {result}")
-        return result
-
-    def _load_strategy_module(self, module_name: str):
-        """
-        以当前包子模块方式加载策略模块，使模块内相对引用（如 from .base import ...）生效。
-        返回加载的模块，失败返回 None。
-        """
-        # 使用包内子模块名加载，保证相对导入有父包
-        full_module_name = f"{__package__}.{module_name}"
-        try:
-            self.logger.info(f"加载模块: {full_module_name}")
-            return importlib.import_module(full_module_name)
-        except Exception as e:
-            self.logger.error(f"加载模块 {full_module_name} 时出错：{e}")
-            return None
-
-    def load_strategies(self, force_reload: bool = False) -> None:
-        """
-        加载所有策略文件中的策略类并注册为实例。
-        :param force_reload: 是否强制重新加载（清空现有策略）
-        """
-        if force_reload:
-            self._strategies.clear()
-
-        # 收集所有策略文件并按解析后的路径去重，避免 Windows 等环境下同一文件被 glob 返回多次
-        seen_resolved: set[Path] = set()
-        strategy_files: list[Path] = []
-        for file_path in self._strategy_dir.glob("*.py"):
-            if self.STRATEGY_FILE_SUFFIX not in file_path.name:
-                self.logger.debug(f"跳过文件: {file_path.name}，不是策略文件")
-                continue
-            resolved = file_path.resolve()
-            if resolved in seen_resolved:
-                self.logger.debug(f"跳过重复路径: {file_path.name}")
-                continue
-            seen_resolved.add(resolved)
-            strategy_files.append(file_path)
-
-        for file_path in strategy_files:
-            module_name = file_path.stem
-            module = self._load_strategy_module(module_name)
-            if module is None:
-                self.logger.error(f"加载模块 {module_name} 时出错：{module}")
-                continue
-
-            # 遍历模块中的属性，找出所有策略类
-            for name, obj in inspect.getmembers(module,predicate=inspect.isclass):
-                # 跳过不是模块内的类
-                if obj.__module__ != module.__name__:
-                    self.logger.debug(f"跳过对象: {name}，不是模块内的类")
-                    continue
-
-                if not self._is_strategy_class(obj):
-                    self.logger.debug(f"跳过对象: {name}，不是策略类")
-                    continue
-
-                # 实例化策略（假定无参构造）
-                try:
-                    strategy_instance = obj()
-                    self.logger.info(f"实例化策略类: {obj.__name__}")
-                except Exception as e:
-                    self.logger.error(f"实例化策略类 {obj.__name__} 时出错：{e}")
-                    continue
-
-                # 注册：使用策略对象的 dto_class 属性作为键
-                key = strategy_instance.dto_class
-                if key in self._strategies:
-                    self.logger.warning(
-                        f"警告：策略 dto_class '{key}' 重复，后面的将覆盖前面的"
-                    )
-                self._strategies[key] = strategy_instance
-
-        self.logger.info(
-            f"策略加载完成，共 {len(self._strategies)} 个策略：{list(self._strategies.keys())}"
-        )
-
-    def get_strategy(
-        self, dto_class: DTOClass|None=None
-    ) -> RepositoryStrategyInterface:
-        """根据dto_class获取策略实例,如果dto_class为None,则返回第一个策略实例"""
-        self.logger.debug(f"根据dto_class获取策略实例: {dto_class}")
-        if dto_class is None:
-            defualt_dto_class = self.list_strategies()[0]
-            if not defualt_dto_class:
-                raise RepositoryException("No strategies registered")
-            strategy = self._strategies.get(defualt_dto_class)
-            self.logger.debug(f"get strategy: {strategy}")
-            if strategy is None:
-                raise RepositoryException(f"No strategy registered for DTO type: {defualt_dto_class.__name__}")
-            return cast(RepositoryStrategyInterface, strategy)
-        else:
-            strategy = self._strategies.get(dto_class)
-            self.logger.debug(f"get strategy: {strategy}")
-            if strategy is None:
-                raise RepositoryException(f"No strategy registered for DTO type: {dto_class.__name__}")
-        return strategy
-    def list_strategies(self) -> list:
-        """返回所有已注册的策略名称列表"""
-        self.logger.debug(
-            f"返回所有已注册的策略名称列表: {list(self._strategies.keys())}"
-        )
+    def get_strategy(self, dto_class: DTOClass) -> RepositoryStrategyInterface:
+        return self._strategies[dto_class]
+    
+    def list_strategies(self) -> list[DTOClass]:
         return list(self._strategies.keys())
+
 
 strategy_manager = None
 
@@ -331,4 +355,9 @@ class MysqlRepository(object):
         self.logger.log("MODULE_INFO",f"get record by source id: {id} result: {result}")
         return result
     
+    def is_processed(self, dto_class: DTOClass,id: int) -> bool:
+        strategy = self._get_strategy(dto_class)
+        result = strategy.is_processed(self, id)
+        self.logger.log("MODULE_INFO",f"is processed: {id} result: {result}")
+        return result
 
