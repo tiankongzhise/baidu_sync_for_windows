@@ -38,12 +38,13 @@ class CompressRecord(ServiceBase):
     __tablename__ = "compress_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
     source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="compress_records", init=False)
-    compress_object_path: Mapped[str] = mapped_column(String(255))
+    compress_file_path: Mapped[str] = mapped_column(String(255))
+    md5: Mapped[str] = mapped_column(String(32))
     __table_args__ = (
             UniqueConstraint("source_id",name="uix_source_id"),
     )
     def __str__(self) -> str:
-            return (f"CompressRecord(id={self.id}, source_id={self.source_id}, compress_object_path={self.compress_object_path}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
+            return (f"CompressRecord(id={self.id}, source_id={self.source_id}, compress_file_path={self.compress_file_path}, md5={self.md5}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class EncryptNameCompressRecord(ServiceBase):
     __tablename__ = "encrypt_name_compress_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))

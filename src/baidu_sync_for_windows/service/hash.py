@@ -76,6 +76,8 @@ def hash_file(*args, **kwargs) -> str:
         case _:
             raise ValueError(f"invalid arguments: {args}")
     match kwargs:
+        case {}:
+            pass
         case {"file_path": file_path_arg}:
             file_path = file_path_arg
         case {"algorithm": algorithm_arg}:

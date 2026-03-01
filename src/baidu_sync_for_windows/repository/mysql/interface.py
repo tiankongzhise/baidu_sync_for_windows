@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session
 from .base import RepositoryStrategyInterface, DTOClass, Record, DTO
 from .sacn_strategy import ScanStrategy
 from .hash_strategy import HashStrategy
+from .compress_strategy import CompressStrategy
 
 # import inspect
 # from typing import Dict
@@ -195,11 +196,14 @@ class StrategyManager:
         self._strategies:dict[DTOClass,RepositoryStrategyInterface] = {
             ScanDTO: ScanStrategy(),
             HashDTO: HashStrategy(),
+            CompressDTO: CompressStrategy(),
         }
     @overload
     def get_strategy(self,dto_class:type[ScanDTO]) -> ScanStrategy:...
     @overload
     def get_strategy(self,dto_class:type[HashDTO]) -> HashStrategy:...
+    @overload
+    def get_strategy(self,dto_class:type[CompressDTO]) -> CompressStrategy:...
     @overload
     def get_strategy(self, dto_class: DTOClass) -> RepositoryStrategyInterface: ...
 

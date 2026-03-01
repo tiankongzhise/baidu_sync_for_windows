@@ -13,25 +13,23 @@ END_OF_QUEUE = object()
 backup_queue = queue.Queue()
 def sync_object_producer(source_object_id:int,repository:DefaultRepository,disk_space_coordinator:DiskSpaceCoordinator):
     _,hash_result = hash_service(source_object_id)
-    if hash_result is None:
-        print(f"hash result is None for source id: {source_object_id}")
-        return
-    repository.save(hash_result)
-
-    compress_result = compress_object(source_object_id,disk_space_coordinator)
-    repository.save(compress_result)
+    if hash_result:
+        repository.save(hash_result)
+    _,compress_result = compress_object(source_object_id,disk_space_coordinator)
+    if compress_result:
+        repository.save(compress_result)
     verify_result = verify_object(source_object_id,disk_space_coordinator)
-    repository.save(verify_result)
-    print(f"Verify result: {verify_result}")
-    backup_queue.put(verify_result)
+    if verify_result:
+        repository.save(verify_result)
+        backup_queue.put(source_object_id)
 
 def sync_object_consumer(repository:DefaultRepository,disk_space_coordinator:DiskSpaceCoordinator):
     while True:
-        verify_result = backup_queue.get()
-        if verify_result is END_OF_QUEUE:
+        source_object_id = backup_queue.get()
+        if source_object_id is END_OF_QUEUE:
             print("Received END_OF_QUEUE, terminating consumer thread")
             break
-        backup_result = backup_object(verify_result,disk_space_coordinator)
+        backup_result = backup_object(source_object_id,disk_space_coordinator)
         repository.save(backup_result)
         backup_queue.task_done()
 
@@ -39,8 +37,8 @@ def sync_object_consumer(repository:DefaultRepository,disk_space_coordinator:Dis
 def get_dependency():
     disk_space_coordinator = DiskSpaceCoordinator(
     {
-        'compression': 40 * 1024 * 1024 * 1024,
-        'verification': 30 * 1024 * 1024 * 1024,
+        'compress': 40 * 1024 * 1024 * 1024,
+        'verify': 30 * 1024 * 1024 * 1024,
         'backup': 10 * 1024 * 1024 * 1024,
     }
 )
