@@ -59,12 +59,16 @@ class VerifyRecord(ServiceBase):
     __tablename__ = "verify_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
     source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="verify_records", init=False)
-    verify_object_path: Mapped[str] = mapped_column(String(255))
+    verify_compress_file_path: Mapped[str] = mapped_column(String(255))
+    md5: Mapped[str] = mapped_column(String(32),nullable=True)
+    sha1: Mapped[str] = mapped_column(String(40),nullable=True)
+    sha256: Mapped[str] = mapped_column(String(64),nullable=True)
+    fast_hash: Mapped[str] = mapped_column(String(64),nullable=True)
     __table_args__ = (
         UniqueConstraint("source_id",name="uix_source_id"),
     )
     def __str__(self) -> str:
-        return (f"VerifyRecord(id={self.id}, source_id={self.source_id}, verify_object_path={self.verify_object_path}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
+        return (f"VerifyRecord(id={self.id}, source_id={self.source_id}, verify_compress_file_path={self.verify_compress_file_path}, md5={self.md5}, sha1={self.sha1}, sha256={self.sha256}, fast_hash={self.fast_hash}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class EncryptNameVerifyRecord(ServiceBase):
     __tablename__ = "encrypt_name_verify_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))

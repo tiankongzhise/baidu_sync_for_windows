@@ -14,7 +14,7 @@ def _check_file_path(file_path:str|Path)->Path:
     return file_path
 
 
-def scan_service(target_path_list:list[Path]|list[str])->list[ScanDTO]:
+def scan_service(target_path_list:list[Path]|list[str]|list[str|Path])->list[ScanDTO]:
     logger.log('SERVICE_INFO',"scan service start")
     result = []
     for target_path in target_path_list:

@@ -13,7 +13,7 @@ from datetime import datetime
 logger = get_logger(bind={"module_name": "compress_service"})
 
 
-def compress_object(
+def compress_service(
     source_id: int, disk_space_coordinator: DiskSpaceCoordinator
 ) -> tuple[int, CompressDTO | None]:
     logger.log('SERVICE_INFO',f"compressing object: {source_id} start,please wait...")
@@ -24,6 +24,9 @@ def compress_object(
     record = repository.get_source_record_by_source_id(CompressDTO, source_id)
     if record is None:
         raise CompressServiceException(f"source id: {source_id} not found")
+    if record.process_type == "manual":
+        logger.log('SERVICE_INFO',f"source id: {source_id} is manual, skip compress")
+        return source_id, None
     disk_space_coordinator.acquire("compress", int(record.target_object_size * 1.05))
     logger.info(f"source id: {source_id} disk space is acquired, start compress")
     source_path = Path(record.target_object_path)

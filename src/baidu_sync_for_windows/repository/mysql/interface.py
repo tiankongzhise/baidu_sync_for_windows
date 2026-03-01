@@ -40,7 +40,7 @@ from .base import RepositoryStrategyInterface, DTOClass, Record, DTO
 from .sacn_strategy import ScanStrategy
 from .hash_strategy import HashStrategy
 from .compress_strategy import CompressStrategy
-
+from .verify_strategy import VerifyStrategy
 # import inspect
 # from typing import Dict
 logger = get_logger(bind={"module_name": "MysqlRepository"})
@@ -197,6 +197,7 @@ class StrategyManager:
             ScanDTO: ScanStrategy(),
             HashDTO: HashStrategy(),
             CompressDTO: CompressStrategy(),
+            VerifyDTO: VerifyStrategy(),
         }
     @overload
     def get_strategy(self,dto_class:type[ScanDTO]) -> ScanStrategy:...
@@ -204,6 +205,8 @@ class StrategyManager:
     def get_strategy(self,dto_class:type[HashDTO]) -> HashStrategy:...
     @overload
     def get_strategy(self,dto_class:type[CompressDTO]) -> CompressStrategy:...
+    @overload
+    def get_strategy(self,dto_class:type[VerifyDTO]) -> VerifyStrategy:...
     @overload
     def get_strategy(self, dto_class: DTOClass) -> RepositoryStrategyInterface: ...
 

@@ -1,4 +1,4 @@
-from baidu_sync_for_windows.dtos import HashDTO
+from baidu_sync_for_windows.dtos import HashDTO,ScanDTO
 from baidu_sync_for_windows.config import get_config
 from baidu_sync_for_windows.repository import get_default_repository
 from baidu_sync_for_windows.logger import get_logger
@@ -49,6 +49,29 @@ def hash_service(source_id: int) -> tuple[int, HashDTO | None]:
         hash_result[algorithm] = hash_func(target_object_path, algorithm,items=target_object_items)
     return source_id, HashDTO(source_id=source_id, **hash_result)
 
+def hash_object(source_id: int, scan_dto: ScanDTO) -> HashDTO:
+    target_object_path = Path(scan_dto.target_object_path)
+    target_path_type = scan_dto.target_object_type
+    target_object_items_count = scan_dto.target_object_items_count
+    target_object_items = scan_dto.target_object_items
+    hash_func = None
+    if target_object_items_count > config.hash.folder_overcount:
+        hash_func = fast_hash_folder
+        hash_value = hash_func(
+            target_object_path, config.hash.folder_fast_hash_algorithm,items=target_object_items
+        )
+        return HashDTO(source_id=source_id, fast_hash=hash_value)
+
+    if target_path_type == "file":
+        hash_func = hash_file
+    elif target_path_type == "directory":
+        hash_func = hash_folder
+    else:
+        raise ValueError(f"target path type: {target_path_type} not supported")
+    hash_result = {}
+    for algorithm in config.hash.algorithm:
+        hash_result[algorithm] = hash_func(target_object_path, algorithm,items=target_object_items)
+    return HashDTO(source_id=source_id, **hash_result)
 
 @overload
 def hash_file(file_path: Path, algorithm: str) -> str: ...
