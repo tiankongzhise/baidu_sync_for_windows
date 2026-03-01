@@ -3,13 +3,21 @@ from concurrent.futures import ThreadPoolExecutor
 import queue
 import threading
 from typing import Callable
-from baidu_sync_for_windows.service import scan_service,compress_object,verify_object,backup_object,DiskSpaceCoordinator
+from baidu_sync_for_windows.service import scan_service,compress_object,verify_object,backup_object,DiskSpaceCoordinator,hash_service
 from baidu_sync_for_windows.repository import get_default_repository,DefaultRepository
 from baidu_sync_for_windows.config import get_config
 from baidu_sync_for_windows.dtos import ScanDTO
+from baidu_sync_for_windows.logger import get_logger
+logger = get_logger(bind={'module_name':'main'})
 END_OF_QUEUE = object()
 backup_queue = queue.Queue()
 def sync_object_producer(source_object_id:int,repository:DefaultRepository,disk_space_coordinator:DiskSpaceCoordinator):
+    _,hash_result = hash_service(source_object_id)
+    if hash_result is None:
+        print(f"hash result is None for source id: {source_object_id}")
+        return
+    repository.save(hash_result)
+
     compress_result = compress_object(source_object_id,disk_space_coordinator)
     repository.save(compress_result)
     verify_result = verify_object(source_object_id,disk_space_coordinator)
@@ -37,12 +45,14 @@ def get_dependency():
     }
 )
     repository = get_default_repository()
+    logger.info("get_dependency success")
     return disk_space_coordinator,repository
 
 def get_objects():
     config = get_config()
     target_path_list = config.source_path.target_path
     scan_result = scan_service(target_path_list)
+    logger.info("get_objects success")
     return scan_result
 
 def get_source_object_ids(objects:list[ScanDTO],repository:DefaultRepository)->list[int]:
@@ -58,9 +68,14 @@ def start_consumer(consumer_worker:Callable,repository:DefaultRepository,disk_sp
     return consumer_thread
 
 def start_producer(producer_worker:Callable,source_object_ids:list[int],repository:DefaultRepository,disk_space_coordinator:DiskSpaceCoordinator):
+    """提交生产者任务并等待全部完成；任一任务抛异常会在此处抛出，避免异常被线程池吞掉。"""
     with ThreadPoolExecutor(max_workers=4) as executor:
-        for source_object_id in source_object_ids:
-            executor.submit(producer_worker,source_object_id,repository,disk_space_coordinator)
+        futures = [
+            executor.submit(producer_worker, source_object_id, repository, disk_space_coordinator)
+            for source_object_id in source_object_ids
+        ]
+        for future in futures:
+            future.result()  # 使工作线程中的异常抛到主线程，否则 save() 失败会静默
 
 def wait_for_complete(consumer_thread:threading.Thread,consumer_queue:queue.Queue):
     consumer_queue.join()

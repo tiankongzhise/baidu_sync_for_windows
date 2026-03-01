@@ -25,6 +25,9 @@ class ConfigSettings(BaseSettings):
     oauth: BaiduPanOAuthSettings = Field(default=BaiduPanOAuthSettings(), description="OAuth设置")
     upload: BaiduPanUploadSettings = Field(default=BaiduPanUploadSettings(), description="上传设置")
 
-config = ConfigSettings()
+config = None
 def get_config() -> ConfigSettings:
+    global config
+    if config is None:
+        config = ConfigSettings()
     return config
