@@ -26,6 +26,7 @@ class CompressSettings(TomlBaseSettings):
         default=200 * 1024 * 1024, description="压缩分块大小,默认200MB"
     )
     exclude_extensions: list[str] = Field(default=[], description="排除的文件扩展名")
+    verify_hash_algorithm: str = Field(default="md5", description="验证哈希算法")
 
     @field_validator("compress_chunk_size", mode="before")
     @classmethod

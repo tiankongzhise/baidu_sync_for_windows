@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing_extensions import TypeAlias
 from sqlalchemy.orm import Session
-from sqlalchemy import Engine,TextClause
+from sqlalchemy import Engine,TextClause,text
 from typing import Generic, TypeVar, Any
 from typing import Type, cast, Protocol
 from baidu_sync_for_windows.exception import RepositoryException
@@ -241,3 +241,47 @@ class RepositoryStrategyInterface(
             return session.execute(sql, params)
     @abstractmethod
     def is_processed(self, repo: RepositoryProtocol, source_id: int) -> bool:...
+
+    def _default_is_processed(self, repo: RepositoryProtocol,source_record: RecordClass, process_record: RecordClass,source_id: int) -> bool:
+        sql = self._get_default_is_processed_sql(source_record.__tablename__, process_record.__tablename__, "id", "source_id", source_id)
+        result = self._default_execute_sql(repo, text(sql))
+        result = result.scalar()
+        if result:
+            return True
+        return False
+    def _get_default_is_processed_sql(self, source_record_name: str, process_record_name: str, source_record_col: str, process_record_col: str, unique_value: int) -> str:
+        sql_temp = f'''SELECT 
+            CASE
+                -- 1. {process_record_name}不存在，直接返回false
+                WHEN hr.{process_record_col} IS NULL THEN FALSE
+                -- 2. {process_record_name}更新时间非空的情况
+                WHEN hr.updated_at IS NOT NULL THEN
+                    CASE
+                        -- {source_record_name}更新时间非空，且大于{process_record_name}更新时间 → false
+                        WHEN sr.updated_at IS NOT NULL AND sr.updated_at > hr.updated_at THEN FALSE
+                        -- {source_record_name}更新时间为空，用创建时间比较，且大于{process_record_name}更新时间 → false
+                        WHEN sr.updated_at IS NULL AND sr.created_at > hr.updated_at THEN FALSE
+                        -- 不满足则返回true
+                        ELSE TRUE
+                    END
+                -- 3. {process_record_name}更新时间为空的情况
+                WHEN hr.updated_at IS NULL THEN
+                    CASE
+                        -- {source_record_name}更新时间非空，且大于{process_record_name}创建时间 → false
+                        WHEN sr.updated_at IS NOT NULL AND sr.updated_at > hr.created_at THEN FALSE
+                        -- {source_record_name}更新时间为空，用创建时间比较，且大于{process_record_name}创建时间 → false
+                        WHEN sr.updated_at IS NULL AND sr.created_at > hr.created_at THEN FALSE
+                        -- 不满足则返回true
+                        ELSE TRUE
+                    END
+                -- 兜底返回true
+                ELSE TRUE
+            END AS result
+        FROM 
+            {source_record_name} sr
+        LEFT JOIN 
+            {process_record_name} hr ON sr.{source_record_col} = hr.{process_record_col}
+        -- 替换为你要查询的具体source_id
+        WHERE 
+            sr.{source_record_col} = {unique_value};'''
+        return sql_temp
