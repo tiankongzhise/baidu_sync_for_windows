@@ -22,7 +22,7 @@ class HashSettings(TomlBaseSettings):
         description="文件或者文件夹大小超过此值时，不再计算hash，由人工处理,默认20GB",
     )
     hash_chunk_size: int = Field(
-        default=200 * 1024 * 1024, description="哈希单次读入大小,默认200MB"
+        default= 512 * 1024, description="哈希单次读入大小,默认512KB"
     )
     fast_hash_chunk_size: int = Field(
         default=1 * 1024 * 1024, description="快速哈希单次读入大小,默认1MB"

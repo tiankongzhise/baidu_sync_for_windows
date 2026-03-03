@@ -3,7 +3,7 @@ from baidu_sync_for_windows.dtos import HashDTO
 from baidu_sync_for_windows.models import HashRecord,SourceRecord
 from baidu_sync_for_windows.logger import get_logger
 from sqlalchemy import text
-from .base import RepositoryStrategyInterface, RepositoryProtocol
+from .base import RepositoryStrategyInterface
 
 
 class HashStrategy(
@@ -18,15 +18,15 @@ class HashStrategy(
             HashDTO, HashRecord, SourceRecord, SourceRecord
         )
         self.logger = get_logger(bind={"module_name": self.__class__.__name__})
-    def save(self, repo: RepositoryProtocol, data: HashDTO) -> HashRecord:
-        return self._default_save(repo, data)
-    def get_source_record_by_source_id(self, repo: RepositoryProtocol, source_id: int) -> SourceRecord | None:
-        return self._default_get_source_record_by_source_id(repo, source_id)
-    def get_latest_service_record_by_source_id(self, repo: RepositoryProtocol, source_id: int) -> SourceRecord | None:
-        return self._default_get_latest_service_record_by_source_id(repo, source_id)
-    def get_record_by_source_id(self, repo: RepositoryProtocol, source_id: int) -> HashRecord | None:
-        return self._default_get_record_by_source_id(repo, source_id)
-    def is_processed(self, repo: RepositoryProtocol, source_id: int) -> bool:
+    def save(self, data: HashDTO) -> HashRecord:
+        return self._default_save( data)
+    def get_source_record_by_source_id(self, source_id: int) -> SourceRecord | None:
+        return self._default_get_source_record_by_source_id( source_id)
+    def get_latest_service_record_by_source_id(self, source_id: int) -> SourceRecord | None:
+        return self._default_get_latest_service_record_by_source_id( source_id)
+    def get_record_by_source_id(self, source_id: int) -> HashRecord | None:
+        return self._default_get_record_by_source_id( source_id)
+    def is_processed(self, source_id: int) -> bool:
         # 判断source_id的hash_record是否存在，不存在直接返回false
         # 如果存在判断hash_record的更新时间是否为None，如果存在，与source_record的更新时间，如果source_record的更新时间大于hash_record的更新时间，则返回false
         # 如果hash_record的更新时间为None，则比较hash_recor的创建时间与source_recor的更新时间，如果hash_recor的创建时间大于source_recor的更新时间，则返回false
@@ -65,5 +65,5 @@ LEFT JOIN
 -- 替换为你要查询的具体source_id
 WHERE 
     sr.id = :source_id;'''
-        result = self._default_execute_sql(repo, text(sql), source_id=source_id)
+        result = self._default_execute_sql(text(sql), source_id=source_id)
         return result.scalar()

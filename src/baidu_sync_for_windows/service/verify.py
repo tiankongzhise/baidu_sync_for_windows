@@ -13,16 +13,16 @@ from .scheduler import DiskSpaceCoordinator
 logger = get_logger(bind={'service_name':'verify'})
 def verify_service(source_object_id:int,disk_space_coordinator:DiskSpaceCoordinator)->tuple[int, VerifyDTO | None]:
     logger.log('SERVICE_INFO',f"verify object start, source object id: {source_object_id}")
-    repository = get_default_repository()
-    if repository.is_processed(VerifyDTO, source_object_id):
+    repository = get_default_repository('verify')
+    if repository.is_processed(source_object_id):
         logger.log('SERVICE_INFO',f"source object id: {source_object_id} is already verified, skip verify")
         return source_object_id, None
-    source_record = repository.get_source_record_by_source_id(VerifyDTO, source_object_id)
+    source_record = repository.get_source_record_by_source_id(source_object_id)
     logger.debug(f"source object id: {source_object_id} source record: {source_record}")
     if source_record.process_type == "manual": # type: ignore
         logger.log('SERVICE_INFO',f"source object id: {source_object_id} is manual, skip verify")
         return source_object_id, None
-    latest_record = repository.get_latest_service_record_by_source_id(VerifyDTO, source_object_id)
+    latest_record = repository.get_latest_service_record_by_source_id(source_object_id)
     logger.debug(f"source object id: {source_object_id} latest service record: {latest_record}")
 
     if latest_record is None:
@@ -35,7 +35,8 @@ def verify_service(source_object_id:int,disk_space_coordinator:DiskSpaceCoordina
         logger.log('SERVICE_INFO',f"verify object calculate unzip verify object hash success, source object id: {source_object_id}")
         hash_temp = hash_dto.model_dump()
         hash_temp.pop('source_id')
-        verify_dto = VerifyDTO(source_id=source_object_id, verify_compress_file_path=latest_record.compress_file_path, **hash_temp)
+        verify_result = repository.is_verify_success(hash_dto)
+        verify_dto = VerifyDTO(source_id=source_object_id, verify_compress_file_path=latest_record.compress_file_path, verify_result=verify_result, **hash_temp)
         logger.log('SERVICE_INFO',f"verify object create verify dto success, source object id: {source_object_id}")
         clean_unzip_verify_object(unzip_verify_object_path)
         logger.log('SERVICE_INFO',f"verify object clean unzip verify object success, source object id: {source_object_id}")

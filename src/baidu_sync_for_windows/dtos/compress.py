@@ -4,8 +4,7 @@ from pathlib import Path
 class CompressDTO(BaseModel):
     source_id: int
     compress_file_path: str
-    md5: str = Field(...,description="MD5",min_length=32,max_length=32)
-
+    
     @field_validator("compress_file_path")
     @classmethod
     def validate_compress_file_path(cls, v: str) -> str:

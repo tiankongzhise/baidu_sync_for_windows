@@ -1,7 +1,5 @@
-from .mysql import MysqlRepository
-from .default import get_default_repository,DefaultRepository
+from .mysql import get_repository as get_default_repository
+from .mysql import StrategyInstance
 __all__ = [
-    "MysqlRepository",
     "get_default_repository",
-    "DefaultRepository"
 ]

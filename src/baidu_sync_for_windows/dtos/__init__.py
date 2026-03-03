@@ -1,8 +1,9 @@
 from .scan import ScanDTO
 from .compress import CompressDTO,EncryptNameCompressDTO
 from .verify import VerifyDTO,EncryptNameVerifyDTO
-from .backup import BackupDTO,EncryptNameBackupDTO
+from .backup import BackupDTO,EncryptNameBackupDTO,BaiduPanRefreshResponse
 from .hash import HashDTO
+from .oauth import OauthDTO,OauthInfo
 __all__ = [
     "ScanDTO",
     "CompressDTO",
@@ -11,5 +12,8 @@ __all__ = [
     "HashDTO",
     "EncryptNameCompressDTO",
     "EncryptNameVerifyDTO",
-    "EncryptNameBackupDTO"
+    "EncryptNameBackupDTO",
+    "BaiduPanRefreshResponse",
+    "OauthDTO",
+    "OauthInfo"
 ]
