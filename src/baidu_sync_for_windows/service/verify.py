@@ -38,7 +38,7 @@ def verify_service(source_object_id:int,disk_space_coordinator:DiskSpaceCoordina
         verify_result = repository.is_verify_success(hash_dto)
         verify_dto = VerifyDTO(source_id=source_object_id, verify_compress_file_path=latest_record.compress_file_path, verify_result=verify_result, **hash_temp)
         logger.log('SERVICE_INFO',f"verify object create verify dto success, source object id: {source_object_id}")
-        clean_unzip_verify_object(unzip_verify_object_path)
+        # clean_unzip_verify_object(unzip_verify_object_path)
         logger.log('SERVICE_INFO',f"verify object clean unzip verify object success, source object id: {source_object_id}")
         logger.log('SERVICE_INFO',f"verify object end, source object id: {source_object_id}")
         return source_object_id, verify_dto
@@ -54,7 +54,8 @@ def unzip_verify_object(compress_file_path:Path)->Path:
             zip_file.setpassword(password.encode('utf-8'))
         zip_file.extractall(unzip_verify_object_path)
     logger.debug(f"unzip verify object end, compress file path: {compress_file_path}, unzip verify object path: {unzip_verify_object_path}, password: {password}")
-    return unzip_verify_object_path
+    verify_path = next(unzip_verify_object_path.iterdir())
+    return verify_path
 
 def calculate_unzip_verify_object_hash(source_id:int,unzip_verify_object_path:Path)->HashDTO:
     logger.debug(f"calculate unzip verify object hash start, source id: {source_id}, unzip verify object path: {unzip_verify_object_path}")

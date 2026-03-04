@@ -1,6 +1,5 @@
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-import queue
 import threading
 from typing import Callable
 from baidu_sync_for_windows.service import scan_service,compress_service,verify_service,backup_service,DiskSpaceCoordinator,hash_service
@@ -9,8 +8,6 @@ from baidu_sync_for_windows.config import get_config
 from baidu_sync_for_windows.dtos import ScanDTO
 from baidu_sync_for_windows.logger import get_logger
 logger = get_logger(bind={'module_name':'main'})
-END_OF_QUEUE = object()
-backup_queue = queue.Queue()
 def sync_object_producer(source_object_id:int,disk_space_coordinator:DiskSpaceCoordinator):
     _,hash_result = hash_service(source_object_id)
     if hash_result:
@@ -24,24 +21,31 @@ def sync_object_producer(source_object_id:int,disk_space_coordinator:DiskSpaceCo
     if verify_result:
         verify_repository = get_default_repository('verify')
         verify_repository.save(verify_result)
-        backup_queue.put(source_object_id)
 
 def sync_object_consumer():
-    while True:
-        source_object_id = backup_queue.get()
-        if source_object_id is END_OF_QUEUE:
-            print("Received END_OF_QUEUE, terminating consumer thread")
-            break
-        try:
-            _,backup_result = backup_service(source_object_id)
-            if backup_result:
-                backup_repository = get_default_repository('backup')
-                backup_repository.save(backup_result)
-        except Exception as e:
-            logger.error(f"save backup_result failed: {e}")
-            traceback.print_exc()
-        finally:
-            backup_queue.task_done()
+    try:
+        is_backup_ids_changed = True
+        backup_ids = []
+        while is_backup_ids_changed:
+            repository = get_default_repository('backup')
+            source_ids_to_backup = repository.get_source_ids_to_backup()
+            source_ids = [source_id for source_id in source_ids_to_backup if source_id not in backup_ids]
+            if not source_ids:
+                is_backup_ids_changed = False
+            for source_object_id in source_ids:
+                backup_ids.append(source_object_id)
+                _,backup_result = backup_service(source_object_id)
+                if backup_result:
+                    backup_repository = get_default_repository('backup')
+                    backup_repository.save(backup_result)
+    except KeyboardInterrupt:
+        logger.log("SERVICE_INFO","Keyboard interrupt received, terminating program")
+        is_backup_ids_changed = False
+
+
+    except Exception as e:
+        logger.error(f"save backup_result failed: {e}")
+        traceback.print_exc()
 
 
 def get_dependency():
@@ -84,9 +88,7 @@ def start_producer(producer_worker:Callable,source_object_ids:list[int],disk_spa
         for future in futures:
             future.result()  # 使工作线程中的异常抛到主线程，否则 save() 失败会静默
 
-def wait_for_complete(consumer_thread:threading.Thread,consumer_queue:queue.Queue):
-    consumer_queue.join()
-    consumer_queue.put(END_OF_QUEUE)
+def wait_for_complete(consumer_thread:threading.Thread):
     consumer_thread.join()
 
 def main():
@@ -98,11 +100,10 @@ def main():
         source_object_ids = get_source_object_ids(objects)
         consumer_thread = start_consumer(sync_object_consumer)
         start_producer(sync_object_producer,source_object_ids,disk_space_coordinator)
-        wait_for_complete(consumer_thread,backup_queue)
+        wait_for_complete(consumer_thread)
         print("Program completed successfully")
     except KeyboardInterrupt:
         print("Keyboard interrupt received, terminating program")
-        backup_queue.put(END_OF_QUEUE)
         if consumer_thread:
             consumer_thread.join(timeout=5)
         if consumer_thread and consumer_thread.is_alive():

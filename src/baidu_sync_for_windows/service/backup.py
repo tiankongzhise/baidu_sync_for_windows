@@ -25,10 +25,18 @@ config = get_config()
 def backup_service(source_object_id:int)->tuple[int,BackupDTO|None]:
     repository = get_default_repository('backup')
     if repository.is_processed(source_object_id):
-        logger.info(f"source object id: {source_object_id} is already backed up, skip backup")
+        logger.log('SERVICE_INFO',f"source object id: {source_object_id} is already backed up, skip backup")
+        return source_object_id, None
+    source_record = repository.get_source_record_by_source_id(source_object_id)
+    if source_record is None:
+        logger.error(f"source object id: {source_object_id} source record not found")
+        raise UploadServiceException(f"source object id: {source_object_id} source record not found")
+    if source_record.process_type == 'manual':
+        logger.log('SERVICE_INFO',f"source object id: {source_object_id} is manual, skip backup")
         return source_object_id, None
     verify_record = repository.get_latest_service_record_by_source_id(source_object_id)
     if verify_record is None:
+        logger.error(f"source object id: {source_object_id} verify record not found")
         raise UploadServiceException(f"source object id: {source_object_id} verify record not found")
     if verify_record.verify_result == 'failed':
         logger.warning(f"source object id: {source_object_id} verify failed, skip backup")
@@ -37,6 +45,7 @@ def backup_service(source_object_id:int)->tuple[int,BackupDTO|None]:
     backup_service = BackupService()
     result = backup_service.backup_task(Path(backup_object_path))
     if result['upload_status'] == 'success':
+        logger.log('SERVICE_INFO',f"source object id: {source_object_id} backup success")
         return source_object_id, BackupDTO(source_id=source_object_id, backup_object_path=backup_object_path, remote_file_name=result['remote_file_name'], remote_file_hash=result['remote_file_hash'])
     else:
         logger.warning(f"source object id: {source_object_id} backup failed, skip backup")
@@ -580,6 +589,6 @@ class BackupService(object):
         self.create_remote_file_task(upload_file_path)
         return {
             'remote_file_name': self._remote_file_name,
-            'remote_file_md5': getattr(self, '_remote_file_md5', None),
+            'remote_file_hash': getattr(self, '_remote_file_md5', None),
             'upload_status': getattr(self, '_upload_status', None),
         }

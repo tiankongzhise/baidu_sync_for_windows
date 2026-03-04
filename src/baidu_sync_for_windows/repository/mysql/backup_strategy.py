@@ -1,6 +1,8 @@
 from baidu_sync_for_windows.dtos import BackupDTO
 from baidu_sync_for_windows.models import BackupRecord,SourceRecord,VerifyRecord
 from baidu_sync_for_windows.logger import get_logger
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from .base import RepositoryStrategyInterface
 
 
@@ -26,3 +28,16 @@ class BackupStrategy(
         return self._default_get_record_by_source_id( source_id)
     def is_processed(self, source_id: int) -> bool:
         return self._default_is_processed( self.source_record_class, self.record_class, source_id)
+    
+    def get_source_ids_to_backup(self) -> list[int]:
+        sql = f"""
+            SELECT  vr.source_id
+            FROM {self.last_service_record_class.__tablename__} vr
+            LEFT JOIN {self.record_class.__tablename__} br 
+                ON vr.source_id = br.source_id
+            WHERE vr.verify_result = 'success' 
+            AND br.source_id IS NULL
+            """
+        with Session(self.engine) as session:
+            result = session.execute(text(sql))
+            return [row[0] for row in result]
