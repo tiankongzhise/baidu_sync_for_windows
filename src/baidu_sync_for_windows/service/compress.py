@@ -1,6 +1,5 @@
 from baidu_sync_for_windows.dtos import CompressDTO
 from baidu_sync_for_windows.config import get_config
-from baidu_sync_for_windows.service.hash import hash_file
 from baidu_sync_for_windows.repository import get_default_repository
 from baidu_sync_for_windows.logger import get_logger
 from baidu_sync_for_windows.exception import CompressServiceException
@@ -17,23 +16,29 @@ def compress_service(
     source_id: int, disk_space_coordinator: DiskSpaceCoordinator
 ) -> tuple[int, CompressDTO | None]:
     logger.log('SERVICE_INFO',f"compressing object: {source_id} start,please wait...")
-    repository = get_default_repository()
-    if repository.is_processed(CompressDTO, source_id):
+    repository = get_default_repository('compress')
+    if repository.is_processed(source_id):
         logger.log('SERVICE_INFO',f"source id: {source_id} is already compressed, skip compress")
         return source_id, None
-    record = repository.get_source_record_by_source_id(CompressDTO, source_id)
+    record = repository.get_source_record_by_source_id(source_id)
     if record is None:
         raise CompressServiceException(f"source id: {source_id} not found")
     if record.process_type == "manual":
         logger.log('SERVICE_INFO',f"source id: {source_id} is manual, skip compress")
         return source_id, None
-    disk_space_coordinator.acquire("compress", int(record.target_object_size * 1.05))
+    latested_service_record = repository.get_latest_service_record_by_source_id(source_id)
+    if not latested_service_record:
+        raise CompressServiceException(f"compress service latested service record of source id: {source_id} not found")
+    if latested_service_record.same_to_source_id != 0:
+        logger.log('SERVICE_INFO',f"source id: {source_id} is hash same to source id: {latested_service_record.same_to_source_id}, skip compress")
+        return source_id, None
+    disk_space_coordinator.acquire("compress", int(record.target_object_size * 1.05),source_id)
     logger.info(f"source id: {source_id} disk space is acquired, start compress")
     source_path = Path(record.target_object_path)
     if record.target_object_type == "file":
-        compress_file_path, compress_file_hash = compress_file(source_path)
+        compress_file_path = compress_file(source_path)
     elif record.target_object_type == "directory":
-        compress_file_path, compress_file_hash = compress_directory(source_path)
+        compress_file_path = compress_directory(source_path)
     else:
         raise ValueError(
             f"target object type: {record.target_object_type} not supported"
@@ -41,9 +46,8 @@ def compress_service(
     compress_dto = CompressDTO(
         source_id=source_id,
         compress_file_path=compress_file_path.absolute().as_posix(),
-        md5=compress_file_hash,
     )
-    logger.log('SERVICE_INFO',f"compress file: {compress_file_path} is created, hash: {compress_file_hash}")
+    logger.log('SERVICE_INFO',f"compress file: {compress_file_path} is created")
     return source_id, compress_dto
 
 
@@ -56,7 +60,7 @@ def compress_file(
     exclude_extensions: list[str] | None = None,
     is_random_salt: bool | None = None,
     **kwargs,
-) -> tuple[Path, str]:
+) -> Path:
     config = get_config()
     compress_file_name = output_path or create_default_compress_file_name(
         source_path, password
@@ -94,14 +98,10 @@ def compress_file(
             zipf, source_path, source_path.name, exclude_extensions
         )
     logger.log('MODULE_INFO',f"compress file: {compress_file_path} is added to compress file")
-    logger.log('MODULE_INFO',f"start to hash compress file: {compress_file_path}")
-    compress_file_hash = hash_file(
-        compress_file_path, config.compress.verify_hash_algorithm
-    )
-    logger.log('MODULE_INFO',f"compress file: {compress_file_path} is hashed, hash: {compress_file_hash}")
+
     if handle_salt:
         handle_salt.remove()
-    return compress_file_path, compress_file_hash
+    return compress_file_path
 
 
 def compress_directory(
@@ -113,7 +113,7 @@ def compress_directory(
     exclude_extensions: list[str] | None = None,
     is_random_salt: bool = True,
     **kwargs,
-) -> tuple[Path, str]:
+) -> Path:
     config = get_config()
     compress_file_name = output_path or create_default_compress_file_name(
         source_path, password
@@ -156,14 +156,10 @@ def compress_directory(
                 exclude_extensions,
             )
     logger.log('MODULE_INFO',f"compress directory: {compress_file_path} is added to compress file")
-    logger.log('MODULE_INFO',f"start to hash compress directory: {compress_file_path}")
-    compress_file_hash = hash_file(
-        compress_file_path, config.compress.verify_hash_algorithm
-    )
-    logger.log('MODULE_INFO',f"compress directory: {compress_file_path} is hashed, hash: {compress_file_hash}")
+  
     if handle_salt:
         handle_salt.remove()
-    return compress_file_path, compress_file_hash
+    return compress_file_path
 
 
 def create_default_compress_file_name(

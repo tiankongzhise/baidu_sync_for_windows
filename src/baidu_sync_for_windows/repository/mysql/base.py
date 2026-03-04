@@ -5,6 +5,7 @@ from sqlalchemy import Engine,TextClause,text
 from typing import Generic, TypeVar, Any
 from typing import Type, cast, Protocol
 from baidu_sync_for_windows.exception import RepositoryException
+from .default import create_default_engine
 from baidu_sync_for_windows.dtos import (
     ScanDTO,
     CompressDTO,
@@ -74,15 +75,17 @@ class RepositoryStrategyInterface(
         record_class: Type[Record_T],
         source_record_class: Type[SourceRecord_T],
         last_service_record_class: Type[LastServiceRecord_T],
+        engine: Engine|None = None,
     ):
         self.dto_class = dto_class
         self.record_class = record_class
         self.source_record_class = source_record_class
         self.last_service_record_class = last_service_record_class
+        self.engine = engine or create_default_engine()
         self.logger = get_logger(bind={"module_name": self.__class__.__name__})
 
 
-    def _default_insert(self, repo: RepositoryProtocol, data: DTO_T) -> Record_T:
+    def _default_insert(self, data: DTO_T) -> Record_T:
         if type(data) is not self.dto_class:
             self.logger.error(
                 f"DTO type mismatch: expected {self.dto_class.__name__}, got {type(data).__name__}. "
@@ -92,7 +95,7 @@ class RepositoryStrategyInterface(
                 f"DTO type mismatch: strategy is for {self.dto_class.__name__}, got {type(data).__name__}"
             )
         try:
-            with Session(repo.engine) as session:
+            with Session(self.engine) as session:
                 record = self.record_class(**data.model_dump())
                 session.add(record)
                 session.commit()
@@ -107,11 +110,11 @@ class RepositoryStrategyInterface(
             raise RepositoryException(
                 f"insert failed for {self.record_class.__name__}: {e}"
             ) from e
-    def _default_update(self, repo: RepositoryProtocol, record: Record_T, data: DTO_T) -> Record_T:
+    def _default_update(self, record: Record_T, data: DTO_T) -> Record_T:
         if self._default_is_equal(record, data):
             self.logger.log("MODULE_BASE_INFO", f"record: {record} is equal to data: {data}, no need to update")
             return record
-        with Session(repo.engine) as session:
+        with Session(self.engine) as session:
             for key, value in data.model_dump().items():
                 setattr(record, key, value)
             session.merge(record)
@@ -122,12 +125,12 @@ class RepositoryStrategyInterface(
 
     @abstractmethod
     def get_source_record_by_source_id(
-        self, repo: RepositoryProtocol, source_id: int
+        self, source_id: int
     ) -> SourceRecord_T | None: ...
     def _default_get_source_record_by_source_id(
-        self, repo: RepositoryProtocol, source_id: int
+        self, source_id: int
     ) -> SourceRecord_T | None:
-        with Session(repo.engine) as session:
+        with Session(self.engine) as session:
             record = (
                 session.query(self.source_record_class)
                 .filter(getattr(self.source_record_class, "id") == source_id)
@@ -147,12 +150,12 @@ class RepositoryStrategyInterface(
 
     @abstractmethod
     def get_latest_service_record_by_source_id(
-        self, repo: RepositoryProtocol, source_id: int
+        self, source_id: int
     ) -> LastServiceRecord_T | None: ...
     def _default_get_latest_service_record_by_source_id(
-        self, repo: RepositoryProtocol, source_id: int
+        self, source_id: int
     ) -> LastServiceRecord_T | None:
-        with Session(repo.engine) as session:
+        with Session(self.engine) as session:
             record = (
                 session.query(self.last_service_record_class)
                 .filter(
@@ -174,12 +177,12 @@ class RepositoryStrategyInterface(
             return None
     @abstractmethod
     def get_record_by_source_id(
-        self, repo: RepositoryProtocol, source_id: int
+        self, source_id: int
     ) -> Record_T | None: ...
     def _default_get_record_by_source_id(
-        self, repo: RepositoryProtocol, source_id: int
+        self, source_id: int
     ) -> Record_T | None:
-        with Session(repo.engine) as session:
+        with Session(self.engine) as session:
             record = (
                 session.query(self.record_class)
                 .filter(
@@ -200,8 +203,8 @@ class RepositoryStrategyInterface(
             return None
 
     @abstractmethod
-    def save(self, repo: RepositoryProtocol, data: DTO_T) -> Record_T: ...
-    def _default_save(self, repo: RepositoryProtocol, data: DTO_T) -> Record_T:
+    def save(self, data: DTO_T) -> Record_T: ...
+    def _default_save(self, data: DTO_T) -> Record_T:
         if getattr(data, "source_id", None) is None:
             self.logger.error(
                 f"save failed: Source id is required, data: {data}"
@@ -209,13 +212,13 @@ class RepositoryStrategyInterface(
             raise RepositoryException(
                 f"base strategy save failed: Source id is required, data: {data}"
             )
-        record = self._default_get_record_by_source_id(repo,getattr(data, "source_id"))  
+        record = self._default_get_record_by_source_id(getattr(data, "source_id"))  
         if not record:
             self.logger.log(
                 "MODULE_BASE_INFO", f"save: insert data: {data.model_dump()}"
             )
-            return self._default_insert(repo, data)
-        result = self._default_update(repo, record,data)
+            return self._default_insert( data)
+        result = self._default_update( record,data)
         self.logger.log("MODULE_BASE_INFO", f"save: update data: {data.model_dump()}")
         return result
 
@@ -231,20 +234,20 @@ class RepositoryStrategyInterface(
         self.logger.debug(f"record:{record} is equal to dto:{data}")
         return True
 
-    def _default_execute_sql(self, repo: RepositoryProtocol, sql: TextClause, *args, **kwargs) -> Any:
+    def _default_execute_sql(self, sql: TextClause, *args, **kwargs) -> Any:
         """执行原生 SQL，*args/**kwargs 会合并为绑定参数透传给 session.execute(statement, parameters)。"""
         params: dict[str, Any] = {}
         if len(args) == 1 and isinstance(args[0], dict):
             params = dict(args[0])
         params.update(kwargs)
-        with Session(repo.engine) as session:
+        with Session(self.engine) as session:
             return session.execute(sql, params)
     @abstractmethod
-    def is_processed(self, repo: RepositoryProtocol, source_id: int) -> bool:...
+    def is_processed(self, source_id: int) -> bool:...
 
-    def _default_is_processed(self, repo: RepositoryProtocol,source_record: RecordClass, process_record: RecordClass,source_id: int) -> bool:
+    def _default_is_processed(self,source_record: RecordClass, process_record: RecordClass,source_id: int) -> bool:
         sql = self._get_default_is_processed_sql(source_record.__tablename__, process_record.__tablename__, "id", "source_id", source_id)
-        result = self._default_execute_sql(repo, text(sql))
+        result = self._default_execute_sql( text(sql))
         result = result.scalar()
         if result:
             return True

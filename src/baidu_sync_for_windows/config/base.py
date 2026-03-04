@@ -6,13 +6,22 @@ from pydantic_settings import (
     PyprojectTomlConfigSettingsSource,
 )
 
-import platform
 from typing import Type, Tuple
 from pathlib import Path
 
+import uuid
+import socket
 
-def drive_letter():
-    return f"{platform.node()}|{platform.processor()}".upper()
+def get_host_name() -> str:
+    return socket.gethostname()
+
+def get_mac_address() -> str:
+    mac_num = uuid.getnode()  # 返回一个整数
+    mac = '-'.join(('%012X' % mac_num)[i:i+2] for i in range(0, 12, 2))
+    return mac
+
+def get_computer_unique_tag() -> str:
+    return f"{get_host_name()}_{get_mac_address()}"
 
 
 class EnvBaseSettings(BaseSettings):

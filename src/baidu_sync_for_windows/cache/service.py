@@ -1,7 +1,6 @@
 from sqlalchemy import create_engine,Engine
 from sqlalchemy.orm import Session
 from typing import Any, overload
-from concurrent.futures import ThreadPoolExecutor
 from .models import CacheRecord
 
 
@@ -11,8 +10,10 @@ class CacheService:
         self.service_tag = service_tag
         self.create_cache_table()
     def _default_engine(self)->Engine:
+        # 使用 shared in-memory，多线程下所有连接共享同一库，否则 :memory: 每个连接独立会报 no such table
         return create_engine(
-            "sqlite:///:memory:"
+            "sqlite:///file:memdb?mode=memory&cache=shared",
+            connect_args={"uri": True},
         )
     def get_session(self)->Session:
         return Session(self.engine)

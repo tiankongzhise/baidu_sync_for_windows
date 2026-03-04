@@ -7,7 +7,7 @@ class ServiceBase(Base):
     metadata = MetaData()
 class SourceRecord(ServiceBase):
     __tablename__ = "source_record"
-    drive_letter: Mapped[str] = mapped_column(String(255))
+    computer_unique_tag: Mapped[str] = mapped_column(String(255))
     target_object_path: Mapped[str] = mapped_column(String(255))
     target_object_name: Mapped[str] = mapped_column(String(255))
     target_object_type: Mapped[str] = mapped_column(String(255))
@@ -16,10 +16,10 @@ class SourceRecord(ServiceBase):
     target_object_items: Mapped[dict[str,int]] = mapped_column(JSON)
     process_type: Mapped[Literal['auto','manual']] = mapped_column(String(10))
     __table_args__ = (
-        UniqueConstraint("drive_letter", "target_object_path",name="uix_drive_letter_target_object_path"),
+        UniqueConstraint("computer_unique_tag", "target_object_path",name="uix_computer_unique_tag_target_object_path"),
     )
     def __str__(self) -> str:
-        return (f"SourceObjectRecord(id={self.id}, drive_letter={self.drive_letter}, target_object_path={self.target_object_path}, target_object_name={self.target_object_name}, target_object_type={self.target_object_type}, target_object_size={self.target_object_size}, target_object_items_count={self.target_object_items_count}, target_object_items={self.target_object_items}, process_type={self.process_type}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
+        return (f"SourceObjectRecord(id={self.id}, computer_unique_tag={self.computer_unique_tag}, target_object_path={self.target_object_path}, target_object_name={self.target_object_name}, target_object_type={self.target_object_type}, target_object_size={self.target_object_size}, target_object_items_count={self.target_object_items_count}, target_object_items={self.target_object_items}, process_type={self.process_type}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 
 class HashRecord(ServiceBase):
     __tablename__ = "hash_record"
@@ -29,22 +29,22 @@ class HashRecord(ServiceBase):
     sha1: Mapped[str] = mapped_column(String(40),nullable=True)
     sha256: Mapped[str] = mapped_column(String(64),nullable=True)
     fast_hash: Mapped[str] = mapped_column(String(64),nullable=True)
+    same_to_source_id: Mapped[int] = mapped_column(Integer,default=0)
     __table_args__ = (
         UniqueConstraint("source_id",name="uix_source_id"),
     )
     def __str__(self) -> str:
-        return (f"HashRecord(id={self.id}, source_id={self.source_id}, md5={self.md5}, sha1={self.sha1}, sha256={self.sha256}, fast_hash={self.fast_hash}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
+        return (f"HashRecord(id={self.id}, source_id={self.source_id}, md5={self.md5}, sha1={self.sha1}, sha256={self.sha256}, fast_hash={self.fast_hash}, same_to_source_id={self.same_to_source_id}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class CompressRecord(ServiceBase):
     __tablename__ = "compress_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
     source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="compress_records", init=False)
     compress_file_path: Mapped[str] = mapped_column(String(255))
-    md5: Mapped[str] = mapped_column(String(32))
     __table_args__ = (
             UniqueConstraint("source_id",name="uix_source_id"),
     )
     def __str__(self) -> str:
-            return (f"CompressRecord(id={self.id}, source_id={self.source_id}, compress_file_path={self.compress_file_path}, md5={self.md5}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
+            return (f"CompressRecord(id={self.id}, source_id={self.source_id}, compress_file_path={self.compress_file_path}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class EncryptNameCompressRecord(ServiceBase):
     __tablename__ = "encrypt_name_compress_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
@@ -64,41 +64,46 @@ class VerifyRecord(ServiceBase):
     sha1: Mapped[str] = mapped_column(String(40),nullable=True)
     sha256: Mapped[str] = mapped_column(String(64),nullable=True)
     fast_hash: Mapped[str] = mapped_column(String(64),nullable=True)
+    verify_result: Mapped[Literal['success','failed']] = mapped_column(String(10))
     __table_args__ = (
         UniqueConstraint("source_id",name="uix_source_id"),
     )
     def __str__(self) -> str:
-        return (f"VerifyRecord(id={self.id}, source_id={self.source_id}, verify_compress_file_path={self.verify_compress_file_path}, md5={self.md5}, sha1={self.sha1}, sha256={self.sha256}, fast_hash={self.fast_hash}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
+        return (f"VerifyRecord(id={self.id}, source_id={self.source_id}, verify_compress_file_path={self.verify_compress_file_path}, md5={self.md5}, sha1={self.sha1}, sha256={self.sha256}, fast_hash={self.fast_hash}, verify_result={self.verify_result}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class EncryptNameVerifyRecord(ServiceBase):
     __tablename__ = "encrypt_name_verify_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
     source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="encrypt_name_verify_records", init=False)
     encrypt_name_verify_object_path: Mapped[str] = mapped_column(String(255))
+    verify_result: Mapped[Literal['success','failed']] = mapped_column(String(10))
     __table_args__ = (
             UniqueConstraint("source_id",name="uix_source_id"),
     )
     def __str__(self) -> str:
-        return (f"EncryptNameVerifyRecord(id={self.id}, source_id={self.source_id}, encrypt_name_verify_object_path={self.encrypt_name_verify_object_path}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
+        return (f"EncryptNameVerifyRecord(id={self.id}, source_id={self.source_id}, encrypt_name_verify_object_path={self.encrypt_name_verify_object_path}, verify_result={self.verify_result}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class BackupRecord(ServiceBase):
     __tablename__ = "backup_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
     source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="backup_records", init=False)
     backup_object_path: Mapped[str] = mapped_column(String(255))
-    backup_object_hash: Mapped[str] = mapped_column(String(32))
+    remote_file_name: Mapped[str] = mapped_column(String(255))
+    remote_file_hash: Mapped[str] = mapped_column(String(32))
     __table_args__ = (
         UniqueConstraint("source_id",name="uix_source_id"),
-        UniqueConstraint("backup_object_hash",name="uix_backup_object_hash"),
+        UniqueConstraint("remote_file_name",name="uix_remote_file_name"),
     )
     def __str__(self) -> str:
-        return (f"BackupObjectRecord(id={self.id}, source_id={self.source_id}, backup_object_path={self.backup_object_path}, backup_object_hash={self.backup_object_hash}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
+        return (f"BackupObjectRecord(id={self.id}, source_id={self.source_id}, backup_object_path={self.backup_object_path}, remote_file_name={self.remote_file_name}, remote_file_hash={self.remote_file_hash}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
 class EncryptNameBackupRecord(ServiceBase):
     __tablename__ = "encrypt_name_backup_record"
     source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
     source: Mapped["SourceRecord"] = relationship("SourceRecord", backref="encrypt_name_backup_records", init=False)
     encrypt_name_backup_object_path: Mapped[str] = mapped_column(String(255))
-    encrypt_name_backup_object_hash: Mapped[str] = mapped_column(String(32))
+    remote_file_name: Mapped[str] = mapped_column(String(255))
+    remote_file_hash: Mapped[str] = mapped_column(String(32))
     __table_args__ = (
         UniqueConstraint("source_id",name="uix_source_id"),
+        UniqueConstraint("remote_file_name",name="uix_remote_file_name"),
     )
     def __str__(self) -> str:
-        return (f"EncryptNameBackupObjectRecord(id={self.id}, source_id={self.source_id}, encrypt_name_backup_object_path={self.encrypt_name_backup_object_path}, encrypt_name_backup_object_hash={self.encrypt_name_backup_object_hash}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")
+        return (f"EncryptNameBackupObjectRecord(id={self.id}, source_id={self.source_id}, encrypt_name_backup_object_path={self.encrypt_name_backup_object_path}, remote_file_name={self.remote_file_name}, remote_file_hash={self.remote_file_hash}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})")

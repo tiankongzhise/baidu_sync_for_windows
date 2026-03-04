@@ -6,15 +6,15 @@ from .verify import VerifierSettings
 from .logger import LoggingSettings
 from .oauth import BaiduPanOAuthSettings
 from .upload import BaiduPanUploadSettings
-from .base import drive_letter
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from .source import SourcePathSettings
+from .base import get_computer_unique_tag
 
 
 
 class ConfigSettings(BaseSettings):
-    drive_letter: str = Field(default=drive_letter(), description="驱动器字母")
+    computer_unique_tag: str = Field(default=get_computer_unique_tag(), description="计算机唯一标识")
     source_path: SourcePathSettings = Field(default=SourcePathSettings(), description="源路径设置")
     database: DatabaseSettings = Field(default=DatabaseSettings(), description="数据库设置")
     scan: ScanSettings = Field(default=ScanSettings(), description="扫描设置")
@@ -22,7 +22,7 @@ class ConfigSettings(BaseSettings):
     compress: CompressSettings = Field(default=CompressSettings(), description="压缩设置")
     verify: VerifierSettings = Field(default=VerifierSettings(), description="验证设置")
     logger: LoggingSettings = Field(default=LoggingSettings(), description="日志设置")
-    oauth: BaiduPanOAuthSettings = Field(default=BaiduPanOAuthSettings(), description="OAuth设置")
+    oauth: BaiduPanOAuthSettings = Field(default=BaiduPanOAuthSettings(), description="OAuth设置") # type: ignore
     upload: BaiduPanUploadSettings = Field(default=BaiduPanUploadSettings(), description="上传设置")
 
 config = None
