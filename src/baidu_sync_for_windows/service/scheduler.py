@@ -1,6 +1,7 @@
 import threading
 from contextlib import contextmanager
 from typing import Dict, Optional
+from collections import defaultdict
 class Scheduler:
     ...
 
@@ -20,17 +21,19 @@ class DiskSpaceCoordinator:
         self._used = {t: 0 for t in quotas}        # 类型 -> 已用空间
         # 每种类型拥有独立的条件变量，但共享同一把锁
         self._conds = {t: threading.Condition(self._lock) for t in quotas}
+        self._acquired_items = defaultdict(dict[int,int])
 
     def _check_type(self, type_: str) -> None:
         """检查资源类型是否存在"""
         if type_ not in self._quotas:
             raise ValueError(f"未知的资源类型: {type_}")
 
-    def acquire(self, type_: str, size: int) -> None:
+    def acquire(self, type_: str, size: int,source_id: int) -> None:
         """
         申请指定类型的空间，如果不足则阻塞直到有足够空间。
         :param type_: 资源类型
         :param size:  申请大小（字节）
+        :param source_id: 源对象ID
         """
         if size <= 0:
             return
@@ -39,13 +42,17 @@ class DiskSpaceCoordinator:
             while self._used[type_] + size > self._quotas[type_]:
                 self._conds[type_].wait()
             self._used[type_] += size
+            self._acquired_items[type_][source_id] = size
 
-    def release(self, type_: str, size: int) -> None:
+    def release(self, type_: str, size: int|None = None,*,source_id: int) -> None:
         """
         释放指定类型的空间，并唤醒所有等待该类型的线程。
         :param type_: 资源类型
         :param size:  释放大小（字节）
+        :param source_id: 源对象ID
         """
+        if size is None:
+            size = self._acquired_items[type_][source_id]
         if size <= 0:
             return
         self._check_type(type_)
@@ -55,9 +62,11 @@ class DiskSpaceCoordinator:
             if self._used[type_] < 0:
                 self._used[type_] = 0
             self._conds[type_].notify_all()
+            del self._acquired_items[type_][source_id]
+
 
     @contextmanager
-    def reserve(self, type_: str, size: int):
+    def reserve(self, type_: str, size: int,source_id: int):
         """
         上下文管理器：自动申请并在退出时释放指定类型的空间。
         适用于临时空间的使用。
@@ -65,11 +74,11 @@ class DiskSpaceCoordinator:
             with coordinator.reserve('verification', 1024):
                 # 执行需要临时空间的操作
         """
-        self.acquire(type_, size)
+        self.acquire(type_, size,source_id)
         try:
             yield
         finally:
-            self.release(type_, size)
+            self.release(type_, size,source_id=source_id)
 
 
     def get_used(self, type_: Optional[str] = None):

@@ -26,7 +26,13 @@ def compress_service(
     if record.process_type == "manual":
         logger.log('SERVICE_INFO',f"source id: {source_id} is manual, skip compress")
         return source_id, None
-    disk_space_coordinator.acquire("compress", int(record.target_object_size * 1.05))
+    latested_service_record = repository.get_latest_service_record_by_source_id(source_id)
+    if not latested_service_record:
+        raise CompressServiceException(f"compress service latested service record of source id: {source_id} not found")
+    if latested_service_record.same_to_source_id != 0:
+        logger.log('SERVICE_INFO',f"source id: {source_id} is hash same to source id: {latested_service_record.same_to_source_id}, skip compress")
+        return source_id, None
+    disk_space_coordinator.acquire("compress", int(record.target_object_size * 1.05),source_id)
     logger.info(f"source id: {source_id} disk space is acquired, start compress")
     source_path = Path(record.target_object_path)
     if record.target_object_type == "file":

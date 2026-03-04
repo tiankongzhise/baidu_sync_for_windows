@@ -34,7 +34,7 @@ class ScanStrategy(
     
     def _get_record_by_unique_column(self, data: ScanDTO) -> SourceRecord | None:
         with Session(self.engine) as session:
-            record = session.query(self.record_class).filter(getattr(self.record_class, "drive_letter") == data.drive_letter, getattr(self.record_class, "target_object_path") == data.target_object_path).first()
+            record = session.query(self.record_class).filter(getattr(self.record_class, "computer_unique_tag") == data.computer_unique_tag, getattr(self.record_class, "target_object_path") == data.target_object_path).first()
             if record:
                 return cast(SourceRecord, record)
             return None

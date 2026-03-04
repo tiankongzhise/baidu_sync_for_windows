@@ -36,8 +36,8 @@ def backup_service(source_object_id:int)->tuple[int,BackupDTO|None]:
         return source_object_id, None
     verify_record = repository.get_latest_service_record_by_source_id(source_object_id)
     if verify_record is None:
-        logger.error(f"source object id: {source_object_id} verify record not found")
-        raise UploadServiceException(f"source object id: {source_object_id} verify record not found")
+        logger.log('SERVICE_INFO',f"verify service latest service record of source object id: {source_object_id} not found, skip backup")
+        return source_object_id, None
     if verify_record.verify_result == 'failed':
         logger.warning(f"source object id: {source_object_id} verify failed, skip backup")
         return source_object_id, None
@@ -507,6 +507,7 @@ class BackupService(object):
             remote_dir = f"/{remote_dir}"
         if not remote_dir.endswith("/"):
             remote_dir = f"{remote_dir}/"
+        remote_dir = f"{remote_dir}{self.config.computer_unique_tag}/"
         compress_temp_dir = Path(self.config.compress.compress_temp_dir).absolute().as_posix()
         if compress_temp_dir in upload_file_path.absolute().as_posix():
             target_file_name = upload_file_path.relative_to(self.config.compress.compress_temp_dir)

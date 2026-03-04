@@ -63,7 +63,7 @@ def _scan_file(file_path:Path)->ScanDTO:
     object_size = object_path.stat().st_size
     process_type = _get_process_type(object_size)
     return ScanDTO(
-        drive_letter=get_config().drive_letter,
+        computer_unique_tag=get_config().computer_unique_tag,
         target_object_path=target_object_path_str,
         target_object_name=object_path.name,
         target_object_type=object_path.is_dir() and "directory" or "file",
@@ -89,7 +89,7 @@ def _scan_directory(directory_path:Path)->ScanDTO:
     }
     process_type = _get_process_type(object_size)
     result = ScanDTO(
-        drive_letter=get_config().drive_letter,
+        computer_unique_tag=get_config().computer_unique_tag,
         target_object_path=target_object_path_str,
         target_object_name=object_path.name,
         target_object_type="directory",

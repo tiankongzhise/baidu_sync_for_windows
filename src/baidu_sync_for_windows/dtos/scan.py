@@ -5,7 +5,7 @@ from typing import Literal
 from baidu_sync_for_windows.exception import ScanServiceException
 from datetime import datetime
 class ScanDTO(BaseModel):
-    drive_letter: str = Field(..., description="驱动器字母")
+    computer_unique_tag: str = Field(..., description="计算机唯一标识")
     target_object_path: str = Field(..., description="目标对象路径")
     target_object_name: str = Field(..., description="目标对象名称")
     target_object_type: str = Field(..., description="目标对象类型")
