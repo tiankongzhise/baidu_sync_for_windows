@@ -3,7 +3,7 @@ from .hash_strategy import HashStrategy
 from .compress_strategy import CompressStrategy
 from .verify_strategy import VerifyStrategy
 from .backup_strategy import BackupStrategy
-# from .encrypt_name_compress_strategy import EncryptNameCompressStrategy
+from .encrypt_name_compress_strategy import EncryptNameCompressStrategy
 # from .encrypt_name_verify_strategy import EncryptNameVerifyStrategy
 # from .encrypt_name_backup_strategy import EncryptNameBackupStrategy
 
@@ -35,10 +35,22 @@ DTOClass: TypeAlias = Type[
     | OauthDTO
 ]
 StrategyClass: TypeAlias = Type[
-    ScanStrategy | HashStrategy | CompressStrategy | VerifyStrategy | BackupStrategy | OauthRepository
+    ScanStrategy
+    | HashStrategy
+    | CompressStrategy
+    | VerifyStrategy
+    | BackupStrategy
+    | EncryptNameCompressStrategy
+    | OauthRepository
 ]
 StrategyInstance: TypeAlias = (
-    ScanStrategy | HashStrategy | CompressStrategy | VerifyStrategy | BackupStrategy | OauthRepository
+    ScanStrategy
+    | HashStrategy
+    | CompressStrategy
+    | VerifyStrategy
+    | BackupStrategy
+    | EncryptNameCompressStrategy
+    | OauthRepository
 )
 
 
@@ -56,6 +68,8 @@ def get_repository_tag_map() -> dict[str | DTOClass, StrategyClass]:
         VerifyDTO: VerifyStrategy,
         "backup": BackupStrategy,
         BackupDTO: BackupStrategy,
+        "encrypt_name_compress": EncryptNameCompressStrategy,
+        EncryptNameCompressDTO: EncryptNameCompressStrategy,
     }
     return repository_tag_map
 
@@ -84,6 +98,14 @@ def get_repository(repository_tag: type[VerifyDTO]) -> VerifyStrategy: ...
 def get_repository(repository_tag: Literal["backup"]) -> BackupStrategy: ...
 @overload
 def get_repository(repository_tag: type[BackupDTO]) -> BackupStrategy: ...
+@overload
+def get_repository(
+    repository_tag: Literal["encrypt_name_compress"],
+) -> EncryptNameCompressStrategy: ...
+@overload
+def get_repository(
+    repository_tag: type[EncryptNameCompressDTO],
+) -> EncryptNameCompressStrategy: ...
 
 
 

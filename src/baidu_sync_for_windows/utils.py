@@ -1,6 +1,6 @@
 import time
 from contextlib import contextmanager
-from baidu_sync_for_windows.models.service import ServiceBase
+from baidu_sync_for_windows.models.service import ServiceBase, RecordTypeClass
 from baidu_sync_for_windows.repository import get_default_repository
 from pathlib import Path
 
@@ -29,5 +29,15 @@ def clean_compress_file(source_id: int):
         compress_file_path = Path(compress_record.compress_file_path)
         compress_file_path.unlink()
 
+def reset_table(table_record:RecordTypeClass):
+    engine = get_default_repository('scan').engine
+    table = table_record.__table__
+    print(f"table: {table}")
+    print('drop talbe please wait...')
+    table_record.metadata.drop_all(engine,tables=[table_record.__table__])
+    print('drop table success')
+    print('create table please wait...')
+    table_record.metadata.create_all(engine,tables=[table_record.__table__])
+    print('create table success')
 
 

@@ -19,7 +19,6 @@ class EncryptNameCompressDTO(BaseModel):
     origin_file_name: str
     encrypt_file_name: str
     compress_file_path: str
-    md5: str = Field(...,description="MD5",min_length=32,max_length=32)
 
     @field_validator("compress_file_path")
     @classmethod

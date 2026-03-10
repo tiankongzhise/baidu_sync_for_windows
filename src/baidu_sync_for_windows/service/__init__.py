@@ -4,6 +4,7 @@ from .compress import compress_service
 from .verify import verify_service
 from .backup import backup_service
 from .scheduler import Scheduler,DiskSpaceCoordinator
+from .cncrypt_name_compress import encrypt_name_compress_service
 __all__ = [
     "scan_service",
     "hash_service",
@@ -11,5 +12,6 @@ __all__ = [
     "verify_service",
     "backup_service",
     "Scheduler",
-    "DiskSpaceCoordinator"
+    "DiskSpaceCoordinator",
+    "encrypt_name_compress_service"
 ]
