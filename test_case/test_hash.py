@@ -49,6 +49,7 @@ def dto_to_dict(dto:HashDTO,target_object_path:str) -> dict[str,str | None]:
         'sha256':dto.sha256,
         'fast_hash':dto.fast_hash
     }
+
 def get_verify_data():
     branch_hash_data = get_branch_hash_data()
     verify_sourec_data = get_verify_sourec_data()

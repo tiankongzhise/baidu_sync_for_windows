@@ -1,12 +1,8 @@
 from baidu_sync_for_windows.repository import get_default_repository
-from baidu_sync_for_windows.dtos import HashDTO
-
-
-
 
 def test_is_hashed():
-    repository = get_default_repository()
-    result = repository.is_processed(HashDTO, 1)
+    repository = get_default_repository('hash')
+    result = repository.is_processed(1)
     print(result)
 
 def verytime():
