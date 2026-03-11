@@ -9,12 +9,9 @@ class CacheService:
         self.engine = engine or self._default_engine()
         self.service_tag = service_tag
         self.create_cache_table()
-    def _default_engine(self)->Engine:
-        # 使用 shared in-memory，多线程下所有连接共享同一库，否则 :memory: 每个连接独立会报 no such table
-        return create_engine(
-            "sqlite:///file:memdb?mode=memory&cache=shared",
-            connect_args={"uri": True},
-        )
+    def _default_engine(self) -> Engine:
+        # 使用标准 :memory: 避免在 Windows 上被解析为文件路径导致 unable to open database file
+        return create_engine("sqlite:///:memory:?cache=shared")
     def get_session(self)->Session:
         return Session(self.engine)
     @overload

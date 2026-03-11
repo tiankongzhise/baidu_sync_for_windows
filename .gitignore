@@ -211,3 +211,7 @@ logs/
 
 # temp
 temp/
+
+# test data
+*test*.json
+*test*.txt
