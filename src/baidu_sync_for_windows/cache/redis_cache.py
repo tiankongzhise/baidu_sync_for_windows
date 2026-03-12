@@ -34,3 +34,8 @@ class RedisCacheService:
         else:
             key,value = self._get_worker(self.redis, key)
             return value
+    
+    def flushall(self,*args,**kwargs):
+        return self.redis.flushall(*args,**kwargs)
+    def flushdb(self,*args,**kwargs):
+        return self.redis.flushdb(*args,**kwargs)
