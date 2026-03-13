@@ -12,38 +12,67 @@ from dowhen import when
 import pyzipper
 from .scheduler import DiskSpaceCoordinator
 from datetime import datetime
+from dataclasses import dataclass
 
 logger = get_logger(bind={"module_name": "encrypt_name_compress_service"})
+
+@dataclass
+class PreCheckResult:
+    is_check_passed: bool
+    check_message: str
+    context: dict
+
+def pre_check(source_id: int) -> PreCheckResult:
+    repository = get_default_repository("encrypt_name_compress")
+    if repository.is_processed(source_id):
+        return PreCheckResult(is_check_passed=False, check_message=f"source id: {source_id} is already encrypting name and compressing, skip encrypting name and compressing", context={})
+    record = repository.get_source_record_by_source_id(source_id)
+    if record is None:
+        return PreCheckResult(is_check_passed=False, check_message=f"source id: {source_id} not found", context={})
+    if record.process_type == "manual":
+        return PreCheckResult(is_check_passed=False, check_message=f"source id: {source_id} is manual, skip encrypting name and compressing", context={})
+    if not Path(record.target_object_path).exists():
+        return PreCheckResult(is_check_passed=False, check_message=f"source id: {source_id} target object path not found", context={})
+    latested_service_record = repository.get_latest_service_record_by_source_id(source_id)
+    if not latested_service_record:
+        return PreCheckResult(is_check_passed=False, check_message=f"encrypt name and compress service latested service record of source id: {source_id} not found", context={})
+    if latested_service_record.same_to_source_id != 0:
+        return PreCheckResult(is_check_passed=False, check_message=f"source id: {source_id} is hash same to source id: {latested_service_record.same_to_source_id}, skip encrypting name and compressing", context={})
+    return PreCheckResult(is_check_passed=True, check_message=f"source id: {source_id} is valid", context={'source_record': record, 'latested_service_record': latested_service_record})
+
 
 
 def encrypt_name_compress_service(
     source_id: int, disk_space_coordinator: DiskSpaceCoordinator
 ) -> tuple[int, EncryptNameCompressDTO | None]:
-    logger.log('SERVICE_INFO',f"encrypting name and compressing object: {source_id} start,please wait...")
-    repository = get_default_repository('encrypt_name_compress')
-    if repository.is_processed(source_id):
-        logger.log('SERVICE_INFO',f"source id: {source_id} is already encrypting name and compressing, skip encrypting name and compressing")
+    logger.log(
+        "SERVICE_INFO",
+        f"encrypting name and compressing object: {source_id} start,please wait...",
+    )
+
+    pre_check_result = pre_check(source_id)
+
+    if not pre_check_result.is_check_passed:
+        logger.log(
+            "SERVICE_INFO",
+            f'encrypt name and compress service pre check failed, reason: {pre_check_result.check_message},skip encrypting name and compressing',
+        )
         return source_id, None
-    record = repository.get_source_record_by_source_id(source_id)
-    if record is None:
-        raise CompressServiceException(f"source id: {source_id} not found")
-    if record.process_type == "manual":
-        logger.log('SERVICE_INFO',f"source id: {source_id} is manual, skip encrypting name and compressing")
-        return source_id, None
-    latested_service_record = repository.get_latest_service_record_by_source_id(source_id)
-    if not latested_service_record:
-        raise EncryptNameCompressServiceException(f"encrypt name and compress service latested service record of source id: {source_id} not found")
-    if latested_service_record.same_to_source_id != 0:
-        logger.log('SERVICE_INFO',f"source id: {source_id} is hash same to source id: {latested_service_record.same_to_source_id}, skip compress")
-        return source_id, None
-    disk_space_coordinator.acquire("compress", int(record.target_object_size * 1.05),source_id)
-    logger.info(f"source id: {source_id} disk space is acquired, start encrypting name and compressing")
+        
+    record = pre_check_result.context['source_record']
+    latested_service_record = pre_check_result.context['latested_service_record']
+    disk_space_coordinator.acquire(
+        "compress", int(record.target_object_size * 1.05), source_id
+    )
+    logger.info(
+        f"source id: {source_id} disk space is acquired, start encrypting name and compressing"
+    )
     encrypt_name = get_encrypt_name(latested_service_record)
     source_path = Path(record.target_object_path)
     if record.target_object_type == "file":
-        compress_file_path = encrypt_and_compress_file(source_path,encrypt_name)
+        compress_file_path = encrypt_and_compress_file(source_path, encrypt_name)
     elif record.target_object_type == "directory":
-        compress_file_path = encrypt_and_compress_directory(source_path,encrypt_name)
+        compress_file_path = encrypt_and_compress_directory(source_path, encrypt_name)
     else:
         raise ValueError(
             f"target object type: {record.target_object_type} not supported"
@@ -54,7 +83,7 @@ def encrypt_name_compress_service(
         encrypt_file_name=encrypt_name,
         compress_file_path=compress_file_path.absolute().as_posix(),
     )
-    logger.log('SERVICE_INFO',f"compress file: {compress_file_path} is created")
+    logger.log("SERVICE_INFO", f"compress file: {compress_file_path} is created")
     return source_id, compress_dto
 
 
@@ -84,7 +113,9 @@ def compress_file(
     is_random_salt = (
         is_random_salt if is_random_salt is not None else config.compress.is_random_salt
     )
-    logger.debug(f"compress file: {compress_file_name} is created, compress level: {compress_level}, exclude extensions: {exclude_extensions}, password: {password}, is random salt: {is_random_salt}")
+    logger.debug(
+        f"compress file: {compress_file_name} is created, compress level: {compress_level}, exclude extensions: {exclude_extensions}, password: {password}, is random salt: {is_random_salt}"
+    )
     handle_salt = None
     if not is_random_salt:
         handle_salt = when(
@@ -104,7 +135,9 @@ def compress_file(
         _add_object_to_compress_file(
             zipf, source_path, source_path.name, exclude_extensions
         )
-    logger.log('MODULE_INFO',f"compress file: {compress_file_path} is added to compress file")
+    logger.log(
+        "MODULE_INFO", f"compress file: {compress_file_path} is added to compress file"
+    )
 
     if handle_salt:
         handle_salt.remove()
@@ -137,7 +170,9 @@ def compress_directory(
     is_random_salt = (
         is_random_salt if is_random_salt is not None else config.compress.is_random_salt
     )
-    logger.debug(f"compress directory: {compress_file_name} is created, compress level: {compress_level}, exclude extensions: {exclude_extensions}, password: {password}, is random salt: {is_random_salt}")
+    logger.debug(
+        f"compress directory: {compress_file_name} is created, compress level: {compress_level}, exclude extensions: {exclude_extensions}, password: {password}, is random salt: {is_random_salt}"
+    )
     handle_salt = None
     if not is_random_salt:
         handle_salt = when(
@@ -162,8 +197,11 @@ def compress_directory(
                 item.relative_to(source_path.parent).as_posix(),
                 exclude_extensions,
             )
-    logger.log('MODULE_INFO',f"compress directory: {compress_file_path} is added to compress file")
-  
+    logger.log(
+        "MODULE_INFO",
+        f"compress directory: {compress_file_path} is added to compress file",
+    )
+
     if handle_salt:
         handle_salt.remove()
     return compress_file_path
@@ -188,10 +226,7 @@ def create_default_compress_file_name(
         )
     else:
         compress_file_name = (
-            compress_temp_dir
-            / date_str
-            / parent_name
-            / f"{source_path.name}.zip"
+            compress_temp_dir / date_str / parent_name / f"{source_path.name}.zip"
         )
     return compress_file_name.absolute().as_posix()
 
@@ -216,19 +251,17 @@ def create_encrypt_compress_file_name(
         )
     else:
         compress_file_name = (
-            compress_temp_dir
-            / date_str
-            / parent_name
-            / f"{encrypt_name}.zip"
+            compress_temp_dir / date_str / parent_name / f"{encrypt_name}.zip"
         )
     return compress_file_name.absolute().as_posix()
 
 
 def get_parent_name(path: Path) -> str:
-    if path.parent.name == '':
-        return path.parent.absolute().as_posix().replace(':/', '盘根目录').upper()
+    if path.parent.name == "":
+        return path.parent.absolute().as_posix().replace(":/", "盘根目录").upper()
     else:
         return path.parent.name
+
 
 def init_compress_file_path(compress_file_name: Path | str) -> Path:
     compress_file_name = Path(compress_file_name)
@@ -250,7 +283,10 @@ def _add_object_to_compress_file(
         return
     logger.debug(f"add object: {source_object_path} to compress file: {zipf.filename}")
     zipf.write(source_object_path, arcname)
-    logger.debug(f"object: {source_object_path} is added to compress file: {zipf.filename}")
+    logger.debug(
+        f"object: {source_object_path} is added to compress file: {zipf.filename}"
+    )
+
 
 def _add_self_salt(self) -> None:
     """为AES加密ZIP添加随机盐值（内部使用）
@@ -275,13 +311,13 @@ def get_object_items(
         return [Path(item) for item in object_items]
 
 
-def get_encrypt_name(latested_service_record:HashRecord) -> str:
+def get_encrypt_name(latested_service_record: HashRecord) -> str:
     """从最近一次服务记录中获取源路径与“加密文件名”。
 
     - 源路径来自 latested_service_record.source.target_object_path
     - 加密文件名优先使用 fast_hash/sha256/sha1/md5 字段，均为空时回退到源对象名
     """
-    repository = get_default_repository('encrypt_name_compress')
+    repository = get_default_repository("encrypt_name_compress")
     encrypt_name: str | None = None
     for attr in ("fast_hash", "md5", "sha1", "sha256"):
         value = getattr(latested_service_record, attr, None)
@@ -289,8 +325,12 @@ def get_encrypt_name(latested_service_record:HashRecord) -> str:
             encrypt_name = value
             break
     if not encrypt_name:
-        logger.error(f"{latested_service_record.source_id} encrypt name invalid,please check hash record")
-        raise EncryptNameCompressServiceException(f"{latested_service_record.source_id} encrypt name invalid,please check hash record")
+        logger.error(
+            f"{latested_service_record.source_id} encrypt name invalid,please check hash record"
+        )
+        raise EncryptNameCompressServiceException(
+            f"{latested_service_record.source_id} encrypt name invalid,please check hash record"
+        )
     return encrypt_name
 
 
@@ -307,5 +347,6 @@ def encrypt_and_compress_directory(source_path: Path, encrypt_name: str) -> Path
     config = get_config()
     password = config.compress.compress_password
     output_path = create_encrypt_compress_file_name(source_path, encrypt_name, password)
-    return compress_directory(source_path, output_path=Path(output_path), password=password)
-
+    return compress_directory(
+        source_path, output_path=Path(output_path), password=password
+    )

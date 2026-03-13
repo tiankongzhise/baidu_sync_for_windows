@@ -4,7 +4,7 @@ from .hash import HashServiceException
 from .compress import CompressServiceException
 from .verify import VerifyServiceException
 from .upload import UploadServiceException
-
+from .scheduler import DiskSpaceCoordinatorServiceException
 __all__ = [
     "ServiceException",
     "ValidationException",
@@ -16,4 +16,5 @@ __all__ = [
     "CompressServiceException",
     "VerifyServiceException",
     "UploadServiceException",
+    "DiskSpaceCoordinatorServiceException",
 ]

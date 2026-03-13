@@ -14,7 +14,7 @@ from baidu_sync_for_windows.repository import get_default_repository
 from baidu_sync_for_windows.config import get_config
 from baidu_sync_for_windows.dtos import ScanDTO
 from baidu_sync_for_windows.logger import get_logger
-from baidu_sync_for_windows.utils import clean_compress_file
+from baidu_sync_for_windows.utils import clean_compress_file,init_record
 logger = get_logger(bind={"module_name": "main"})
 
 
@@ -45,29 +45,24 @@ def sync_object_consumer(disk_space_coordinator: DiskSpaceCoordinator):
     time.sleep(10)
     logger.log("SERVICE_INFO", "sync_object_consumer sleep 10 seconds,start to backup")
     try:
-        is_backup_ids_changed = True
-        backup_ids = []
-        while is_backup_ids_changed:
+        unreleased_source_id = disk_space_coordinator.get_unreleased_source_id()
+        has_unreleased_source_id = True if unreleased_source_id else False
+
+        while has_unreleased_source_id:
             repository = get_default_repository("backup")
             source_ids_to_backup = repository.get_source_ids_to_backup()
-            source_ids = [
-                source_id
-                for source_id in source_ids_to_backup
-                if source_id not in backup_ids
-            ]
-            if not source_ids:
-                is_backup_ids_changed = False
-            for source_object_id in source_ids:
-                backup_ids.append(source_object_id)
+            for source_object_id in source_ids_to_backup:
                 _, backup_result = backup_service(source_object_id)
                 if backup_result:
                     backup_repository = get_default_repository("backup")
                     backup_repository.save(backup_result)
                     disk_space_coordinator.release("compress",source_id=source_object_id)
                     clean_compress_file(source_object_id)
+            unreleased_source_id = disk_space_coordinator.get_unreleased_source_id()
+            has_unreleased_source_id = True if unreleased_source_id else False
     except KeyboardInterrupt:
         logger.log("SERVICE_INFO", "Keyboard interrupt received, terminating program")
-        is_backup_ids_changed = False
+        has_unreleased_source_id = False
 
     except Exception as e:
         logger.error(f"save backup_result failed: {e}")
@@ -129,6 +124,7 @@ def wait_for_complete(consumer_thread: threading.Thread):
 
 def main():
     print("Starting program")
+    init_record()
     consumer_thread = None
     try:
         disk_space_coordinator = get_dependency()

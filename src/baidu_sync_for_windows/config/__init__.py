@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 from .source import SourcePathSettings
 from .base import get_computer_unique_tag
-
+from .scheduler import SchedulerSettings
 
 
 class ConfigSettings(BaseSettings):
@@ -24,7 +24,7 @@ class ConfigSettings(BaseSettings):
     logger: LoggingSettings = Field(default=LoggingSettings(), description="日志设置")
     oauth: BaiduPanOAuthSettings = Field(default=BaiduPanOAuthSettings(), description="OAuth设置") # type: ignore
     upload: BaiduPanUploadSettings = Field(default=BaiduPanUploadSettings(), description="上传设置")
-
+    scheduler: SchedulerSettings = Field(default=SchedulerSettings(), description="调度设置")
 config = None
 def get_config() -> ConfigSettings:
     global config

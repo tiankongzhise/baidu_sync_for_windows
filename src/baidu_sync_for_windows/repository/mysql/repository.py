@@ -8,7 +8,7 @@ from .encrypt_name_compress_strategy import EncryptNameCompressStrategy
 # from .encrypt_name_backup_strategy import EncryptNameBackupStrategy
 
 from .oauth_repository import OauthRepository
-
+from .scheduler_repository import DiskSpaceCoordinatorRepository
 from baidu_sync_for_windows.dtos import (
     ScanDTO,
     HashDTO,
@@ -19,6 +19,7 @@ from baidu_sync_for_windows.dtos import (
     EncryptNameVerifyDTO,
     EncryptNameBackupDTO,
     OauthDTO,
+    DiskSpaceCoordinatorDTO,
 )
 from typing import Type, TypeAlias, overload, Literal
 from baidu_sync_for_windows.exception import RepositoryException
@@ -33,6 +34,7 @@ DTOClass: TypeAlias = Type[
     | EncryptNameVerifyDTO
     | EncryptNameBackupDTO
     | OauthDTO
+    | DiskSpaceCoordinatorDTO
 ]
 StrategyClass: TypeAlias = Type[
     ScanStrategy
@@ -42,6 +44,7 @@ StrategyClass: TypeAlias = Type[
     | BackupStrategy
     | EncryptNameCompressStrategy
     | OauthRepository
+    | DiskSpaceCoordinatorRepository
 ]
 StrategyInstance: TypeAlias = (
     ScanStrategy
@@ -51,6 +54,7 @@ StrategyInstance: TypeAlias = (
     | BackupStrategy
     | EncryptNameCompressStrategy
     | OauthRepository
+    | DiskSpaceCoordinatorRepository
 )
 
 
@@ -70,6 +74,8 @@ def get_repository_tag_map() -> dict[str | DTOClass, StrategyClass]:
         BackupDTO: BackupStrategy,
         "encrypt_name_compress": EncryptNameCompressStrategy,
         EncryptNameCompressDTO: EncryptNameCompressStrategy,
+        "disk_space_coordinator": DiskSpaceCoordinatorRepository,
+        DiskSpaceCoordinatorDTO: DiskSpaceCoordinatorRepository,
     }
     return repository_tag_map
 
@@ -106,7 +112,10 @@ def get_repository(
 def get_repository(
     repository_tag: type[EncryptNameCompressDTO],
 ) -> EncryptNameCompressStrategy: ...
-
+@overload
+def get_repository(repository_tag: Literal["disk_space_coordinator"]) -> DiskSpaceCoordinatorRepository: ...
+@overload
+def get_repository(repository_tag: type[DiskSpaceCoordinatorDTO]) -> DiskSpaceCoordinatorRepository: ...
 
 
 _instance_map = {}

@@ -22,6 +22,10 @@ def reset_service_record():
     print(f"create_all: {engine}")
 
 
+
+def reset_all_record():
+    reset_service_record()
+
 def clean_compress_file(source_id: int):
     compress_repository = get_default_repository("compress")
     compress_record = compress_repository.get_record_by_source_id(source_id)
@@ -29,15 +33,26 @@ def clean_compress_file(source_id: int):
         compress_file_path = Path(compress_record.compress_file_path)
         compress_file_path.unlink()
 
-def reset_table(table_record:RecordTypeClass):
+def reset_service_table(table_record:RecordTypeClass):
     engine = get_default_repository('scan').engine
     table = table_record.__table__
     print(f"table: {table}")
     print('drop talbe please wait...')
-    table_record.metadata.drop_all(engine,tables=[table_record.__table__])
+    table_record.metadata.drop_all(engine,tables=[table_record.__table__]) #type: ignore
     print('drop table success')
     print('create table please wait...')
-    table_record.metadata.create_all(engine,tables=[table_record.__table__])
+    table_record.metadata.create_all(engine,tables=[table_record.__table__]) #type: ignore
     print('create table success')
 
+
+
+def init_service_record():
+    engine = get_default_repository('scan').engine
+    ServiceBase.metadata.create_all(engine)
+    print('init service table success')
+
+
+
+def init_record():
+    init_service_record()
 

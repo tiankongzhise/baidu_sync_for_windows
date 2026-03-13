@@ -8,9 +8,8 @@ from .service import (
     EncryptNameVerifyRecord,
     BackupRecord,
     EncryptNameBackupRecord,
-    ServiceBase,
+    DiskSpaceCoordinatorRecord,
 )
-
 __all__ = [
     "OauthRecord",
     "SourceRecord",
@@ -21,5 +20,5 @@ __all__ = [
     "EncryptNameVerifyRecord",
     "BackupRecord",
     "EncryptNameBackupRecord",
-    "ServiceBase",
+    "DiskSpaceCoordinatorRecord",
 ]

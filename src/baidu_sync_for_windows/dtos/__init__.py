@@ -4,6 +4,7 @@ from .verify import VerifyDTO,EncryptNameVerifyDTO
 from .backup import BackupDTO,EncryptNameBackupDTO,BaiduPanRefreshResponse
 from .hash import HashDTO
 from .oauth import OauthDTO,OauthInfo
+from .scheduler import DiskSpaceCoordinatorDTO
 __all__ = [
     "ScanDTO",
     "CompressDTO",
@@ -15,5 +16,6 @@ __all__ = [
     "EncryptNameBackupDTO",
     "BaiduPanRefreshResponse",
     "OauthDTO",
-    "OauthInfo"
+    "OauthInfo",
+    "DiskSpaceCoordinatorDTO"
 ]

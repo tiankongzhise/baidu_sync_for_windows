@@ -162,3 +162,19 @@ class EncryptNameBackupRecord(ServiceBase):
 
     def __str__(self) -> str:
         return f"EncryptNameBackupObjectRecord(id={self.id}, source_id={self.source_id}, encrypt_name_backup_object_path={self.encrypt_name_backup_object_path}, remote_file_name={self.remote_file_name}, remote_file_hash={self.remote_file_hash}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})"
+
+
+class DiskSpaceCoordinatorRecord(ServiceBase):
+    __tablename__ = "disk_space_coordinator_record"
+    source_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_record.id"))
+    source: Mapped["SourceRecord"] = relationship(
+        "SourceRecord", backref="disk_space_coordinator_records", init=False
+    )
+    type: Mapped[str] = mapped_column(String(32))
+    disk_space: Mapped[int] = mapped_column(BigInteger)
+    status: Mapped[Literal["acquire", "release"]] = mapped_column(String(10))
+
+    __table_args__ = (UniqueConstraint("source_id", "type", name="uix_source_id_type"),)
+
+    def __str__(self) -> str:
+        return f"DiskSpaceCoordinatorRecord(id={self.id}, source_id={self.source_id}, type={self.type}, disk_space={self.disk_space}, status={self.status}, created_at={self.created_time_to_local_time}, updated_at={self.updated_time_to_local_time}, latested_at={self.latested_time_to_local_time})"
